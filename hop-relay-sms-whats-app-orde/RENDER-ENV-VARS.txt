@@ -1,0 +1,16 @@
+# Copy these environment variables to Render Dashboard
+# After creating your web service, go to: Environment tab
+
+SHOPIFY_API_KEY=2ba8e6117cba33bf73b057cb11b169db
+SHOPIFY_API_SECRET=get_from_partners_shopify_com
+SHOPIFY_APP_URL=will_be_your_render_url
+SCOPES=read_orders,read_customers
+DATABASE_URL=will_be_provided_by_render_postgresql
+HOPRELAY_ADMIN_BASE_URL=https://hoprelay.com/admin
+HOPRELAY_API_BASE_URL=https://hoprelay.com/api
+HOPRELAY_SYSTEM_TOKEN=your_hoprelay_token
+HOPRELAY_DEFAULT_COUNTRY=US
+HOPRELAY_DEFAULT_TIMEZONE=America/New_York
+HOPRELAY_DEFAULT_LANGUAGE_ID=1
+HOPRELAY_DEFAULT_ROLE_ID=2
+NODE_ENV=production
