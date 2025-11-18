@@ -7,17 +7,22 @@ export const action = async ({ request }) => {
   console.log(`Received ${topic} webhook for ${shop}`);
   console.log("shop/redact payload:", JSON.stringify(payload));
 
-  // Delete shop-specific data you store for this app.
+  // Delete all shop-specific data as required by GDPR
   try {
+    // Delete HopRelay settings
     await prisma.hopRelaySettings.deleteMany({
       where: { shop },
     });
-  } catch (error) {
-    console.error("Error deleting HopRelaySettings for shop/redact:", error);
-  }
 
-  // Session data is already removed on app/uninstalled webhook, but
-  // you could also clean other tables here if you add them later.
+    // Delete sessions
+    await prisma.session.deleteMany({
+      where: { shop },
+    });
+
+    console.log(`Successfully redacted all data for shop: ${shop}`);
+  } catch (error) {
+    console.error("Error deleting data for shop/redact:", error);
+  }
 
   return new Response();
 };
