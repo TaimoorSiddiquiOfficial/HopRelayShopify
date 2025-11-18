@@ -5,6 +5,9 @@ name = "HopRelay – SMS & WhatsApp Orde"
 application_url = "https://hoprelay.com"
 embedded = true
 
+[build]
+automatically_update_urls_on_dev = true
+
 [webhooks]
 api_version = "2025-10"
 
@@ -16,6 +19,3 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [ ]
-
-[build]
-automatically_update_urls_on_dev = true
