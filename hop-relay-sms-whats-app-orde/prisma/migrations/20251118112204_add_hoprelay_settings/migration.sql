@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "HopRelaySettings" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "shop" TEXT NOT NULL,
     "hoprelayUserId" INTEGER,
     "hoprelayUserEmail" TEXT,
@@ -16,8 +16,10 @@ CREATE TABLE "HopRelaySettings" (
     "orderDeliveredTemplate" TEXT,
     "marketingDefaultChannel" TEXT,
     "marketingDefaultMode" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "HopRelaySettings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
