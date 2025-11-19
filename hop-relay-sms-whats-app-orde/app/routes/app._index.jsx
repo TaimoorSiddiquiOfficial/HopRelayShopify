@@ -104,6 +104,8 @@ export const loader = async ({ request }) => {
   }
 
   return {
+    hoprelayAdminUrl:
+      process.env.HOPRELAY_ADMIN_BASE_URL || "https://hoprelay.com/admin",
     shop: shopInfo,
     hoprelaySettings,
     hoprelayPackages,
@@ -612,6 +614,7 @@ export const action = async ({ request }) => {
 
 export default function Index() {
   const {
+    hoprelayAdminUrl,
     shop,
     hoprelaySettings,
     hoprelayPackages,
@@ -699,6 +702,12 @@ export default function Index() {
             onClick={() => setActiveTab("account")}
           >
             Account &amp; Plan
+          </s-button>
+          <s-button
+            variant={activeTab === "connections" ? "primary" : "tertiary"}
+            onClick={() => setActiveTab("connections")}
+          >
+            Connections
           </s-button>
           <s-button
             variant={activeTab === "notifications" ? "primary" : "tertiary"}
@@ -1002,6 +1011,82 @@ export default function Index() {
               </createApiKeyFetcher.Form>
             )}
           </s-section>
+        </s-section>
+      )}
+
+      {activeTab === "connections" && (
+        <s-section heading="Connections">
+          <s-stack direction="block" gap="base">
+            <s-text>
+              Connect Android SMS gateways and WhatsApp accounts to HopRelay. These
+              senders are used for order notifications and marketing campaigns.
+            </s-text>
+
+            <s-stack direction="inline" gap="base">
+              <s-button target="_blank" href={hoprelayAdminUrl}>
+                Open HopRelay dashboard
+              </s-button>
+              <s-button
+                target="_blank"
+                href="https://play.google.com/store/search?q=hoprelay"
+                variant="tertiary"
+              >
+                Download Android gateway app
+              </s-button>
+            </s-stack>
+
+            <s-section heading="Linked Android SMS devices">
+              {hoprelayDevices.length === 0 ? (
+                <s-text>
+                  No Android devices are linked yet. Install the HopRelay Android app and
+                  connect a device from your HopRelay dashboard.
+                </s-text>
+              ) : (
+                <s-stack direction="block" gap="tight">
+                  {hoprelayDevices.map((device) => (
+                    <s-stack
+                      key={device.unique}
+                      direction="inline"
+                      gap="base"
+                      align="center"
+                    >
+                      <s-badge tone="success">SMS</s-badge>
+                      <s-text>
+                        {device.device_name || "Android device"} (
+                        {device.phone || "No number"})
+                      </s-text>
+                    </s-stack>
+                  ))}
+                </s-stack>
+              )}
+            </s-section>
+
+            <s-section heading="Linked WhatsApp accounts">
+              {hoprelayWaAccounts.length === 0 ? (
+                <s-text>
+                  No WhatsApp accounts are linked yet. Connect WhatsApp from your
+                  HopRelay dashboard, then return here to see them listed.
+                </s-text>
+              ) : (
+                <s-stack direction="block" gap="tight">
+                  {hoprelayWaAccounts.map((account) => (
+                    <s-stack
+                      key={account.unique || account.id}
+                      direction="inline"
+                      gap="base"
+                      align="center"
+                    >
+                      <s-badge tone="success">WhatsApp</s-badge>
+                      <s-text>
+                        {account.name || "WhatsApp account"} (
+                        {account.phone || account.number || "No number"})
+                      </s-text>
+                    </s-stack>
+                  ))}
+                </s-stack>
+              )}
+            </s-section>
+          </s-stack>
         </s-section>
       )}
 
