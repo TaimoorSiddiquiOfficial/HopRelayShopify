@@ -4,6 +4,8 @@ const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
 
 const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
+const HOPRELAY_SSO_PLUGIN_TOKEN =
+  process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
 
 const DEFAULT_COUNTRY = process.env.HOPRELAY_DEFAULT_COUNTRY || "US";
 const DEFAULT_TIMEZONE =
@@ -38,6 +40,45 @@ async function parseJsonResponse(response) {
   }
 
   return json;
+}
+
+export async function createHopRelaySsoLink({
+  userId,
+  redirect = "dashboard",
+} = {}) {
+  if (!HOPRELAY_SSO_PLUGIN_TOKEN) {
+    return null;
+  }
+
+  ensureSystemToken();
+
+  const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/plugin`);
+  url.searchParams.set("name", "shopify-sso");
+  url.searchParams.set("action", "sso_link");
+  url.searchParams.set("user", String(userId));
+  url.searchParams.set("token", HOPRELAY_SSO_PLUGIN_TOKEN);
+  url.searchParams.set("redirect", redirect);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+  });
+
+  let json;
+  try {
+    json = await response.json();
+  } catch (error) {
+    throw new Error("Unable to parse HopRelay SSO response.");
+  }
+
+  if (!response.ok || !json || !json.url) {
+    const message =
+      (json && json.message) || "HopRelay SSO link request failed.";
+    const error = new Error(message);
+    error.details = json;
+    throw error;
+  }
+
+  return json.url;
 }
 
 export async function getHopRelayPackages() {
