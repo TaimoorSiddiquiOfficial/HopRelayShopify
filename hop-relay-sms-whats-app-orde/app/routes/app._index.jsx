@@ -15,6 +15,7 @@ import {
   getHopRelaySubscription,
   getHopRelayDevices,
   getHopRelayWaAccounts,
+  createHopRelaySsoLink,
   sendHopRelaySmsBulk,
   sendHopRelayWhatsappBulk,
 } from "../hoprelay.server";
@@ -85,6 +86,9 @@ export const loader = async ({ request }) => {
   let hoprelayDevices = [];
   let hoprelayWaAccounts = [];
   let hoprelaySendersError = null;
+  let hoprelayDashboardSsoUrl = null;
+  let hoprelayAndroidSsoUrl = null;
+  let hoprelayWhatsappSsoUrl = null;
 
   try {
     if (hoprelaySettings?.hoprelayApiSecret) {
@@ -97,6 +101,32 @@ export const loader = async ({ request }) => {
 
       hoprelayDevices = devices || [];
       hoprelayWaAccounts = waAccounts || [];
+
+      if (hoprelaySettings?.hoprelayUserId) {
+        try {
+          const [dashboardUrl, androidUrl, whatsappUrl] =
+            await Promise.all([
+              createHopRelaySsoLink({
+                userId: hoprelaySettings.hoprelayUserId,
+                redirect: "dashboard",
+              }),
+              createHopRelaySsoLink({
+                userId: hoprelaySettings.hoprelayUserId,
+                redirect: "dashboard/hosts/android",
+              }),
+              createHopRelaySsoLink({
+                userId: hoprelaySettings.hoprelayUserId,
+                redirect: "dashboard/hosts/whatsapp",
+              }),
+            ]);
+
+          hoprelayDashboardSsoUrl = dashboardUrl;
+          hoprelayAndroidSsoUrl = androidUrl;
+          hoprelayWhatsappSsoUrl = whatsappUrl;
+        } catch (error) {
+          console.error("Failed to create HopRelay SSO links:", error);
+        }
+      }
     }
   } catch (error) {
     hoprelaySendersError =
@@ -113,6 +143,9 @@ export const loader = async ({ request }) => {
     hoprelayDevices,
     hoprelayWaAccounts,
     hoprelaySendersError,
+    hoprelayDashboardSsoUrl,
+    hoprelayAndroidSsoUrl,
+    hoprelayWhatsappSsoUrl,
   };
 };
 
@@ -621,6 +654,9 @@ export default function Index() {
     hoprelayDevices,
     hoprelayWaAccounts,
     hoprelaySendersError,
+    hoprelayDashboardSsoUrl,
+    hoprelayAndroidSsoUrl,
+    hoprelayWhatsappSsoUrl,
   } = useLoaderData();
 
   const createAccountFetcher = useFetcher();
@@ -1020,19 +1056,31 @@ export default function Index() {
             </s-text>
 
             <s-stack direction="inline" gap="base">
-              <s-button target="_blank" href="https://hoprelay.com/dashboard">
+              <s-button
+                target="_blank"
+                href={
+                  hoprelayDashboardSsoUrl ||
+                  "https://hoprelay.com/dashboard"
+                }
+              >
                 Open HopRelay dashboard
               </s-button>
               <s-button
                 target="_blank"
-                href="https://hoprelay.com/dashboard/hosts/android"
+                href={
+                  hoprelayAndroidSsoUrl ||
+                  "https://hoprelay.com/dashboard/hosts/android"
+                }
                 variant="tertiary"
               >
                 Connect Android gateway
               </s-button>
               <s-button
                 target="_blank"
-                href="https://hoprelay.com/dashboard/hosts/whatsapp"
+                href={
+                  hoprelayWhatsappSsoUrl ||
+                  "https://hoprelay.com/dashboard/hosts/whatsapp"
+                }
                 variant="tertiary"
               >
                 Add WhatsApp account
