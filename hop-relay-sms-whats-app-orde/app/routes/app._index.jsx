@@ -1028,10 +1028,17 @@ export default function Index() {
               </s-button>
               <s-button
                 target="_blank"
-                href="https://play.google.com/store/search?q=hoprelay"
+                href="https://hoprelay.com/dashboard/hosts/android"
                 variant="tertiary"
               >
-                Download Android gateway app
+                Connect Android gateway
+              </s-button>
+              <s-button
+                target="_blank"
+                href="https://hoprelay.com/dashboard/hosts/whatsapp"
+                variant="tertiary"
+              >
+                Add WhatsApp account
               </s-button>
             </s-stack>
 
