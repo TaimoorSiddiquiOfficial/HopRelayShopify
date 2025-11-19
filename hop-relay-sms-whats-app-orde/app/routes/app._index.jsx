@@ -104,8 +104,6 @@ export const loader = async ({ request }) => {
   }
 
   return {
-    hoprelayAdminUrl:
-      process.env.HOPRELAY_ADMIN_BASE_URL || "https://hoprelay.com/admin",
     shop: shopInfo,
     hoprelaySettings,
     hoprelayPackages,
@@ -614,7 +612,6 @@ export const action = async ({ request }) => {
 
 export default function Index() {
   const {
-    hoprelayAdminUrl,
     shop,
     hoprelaySettings,
     hoprelayPackages,
@@ -1023,7 +1020,7 @@ export default function Index() {
             </s-text>
 
             <s-stack direction="inline" gap="base">
-              <s-button target="_blank" href={hoprelayAdminUrl}>
+              <s-button target="_blank" href="https://hoprelay.com/dashboard">
                 Open HopRelay dashboard
               </s-button>
               <s-button
