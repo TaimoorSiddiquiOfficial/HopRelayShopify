@@ -1,8 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "0077ca9a25d136c796883c2a55281ff3"
-name = "HopRelay – SMS & WhatsApp Orde"
-application_url = "https://hoprelay.com"
+name = "HopRelay - SMS & WhatsApp Orde"
+application_url = "https://hoprelay.onrender.com"
 embedded = true
 
 [build]
@@ -46,4 +46,4 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = [ "https://hoprelay.onrender.com/auth/callback" ]
