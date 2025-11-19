@@ -7,6 +7,11 @@ const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
 const HOPRELAY_SSO_PLUGIN_TOKEN =
   process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
 
+// Public web base (used for /plugin endpoint). Falls back to stripping `/admin`.
+const HOPRELAY_WEB_BASE_URL =
+  process.env.HOPRELAY_WEB_BASE_URL ||
+  HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+
 const DEFAULT_COUNTRY = process.env.HOPRELAY_DEFAULT_COUNTRY || "US";
 const DEFAULT_TIMEZONE =
   process.env.HOPRELAY_DEFAULT_TIMEZONE || "America/New_York";
@@ -52,7 +57,8 @@ export async function createHopRelaySsoLink({
 
   ensureSystemToken();
 
-  const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/plugin`);
+  // Plugin endpoints live under /plugin, not /admin.
+  const url = new URL(`${HOPRELAY_WEB_BASE_URL}/plugin`);
   url.searchParams.set("name", "shopify-sso");
   url.searchParams.set("action", "sso_link");
   url.searchParams.set("user", String(userId));
