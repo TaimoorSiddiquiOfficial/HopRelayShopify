@@ -455,12 +455,16 @@ export const action = async ({ request }) => {
       const defaultSmsDeviceIdRaw = formData.get("defaultSmsDeviceId") || "";
       const defaultSmsSimRaw = formData.get("defaultSmsSim") || "";
       const defaultWaAccountRaw = formData.get("defaultWaAccount") || "";
+      const notificationChannelRaw =
+        formData.get("notificationChannel") || "";
 
       const defaultSmsDeviceId = defaultSmsDeviceIdRaw || null;
       const defaultSmsSim = defaultSmsSimRaw
         ? Number(defaultSmsSimRaw)
         : null;
       const defaultWaAccount = defaultWaAccountRaw || null;
+      const notificationChannel =
+        notificationChannelRaw || "sms";
 
       try {
         const existing =
@@ -476,6 +480,7 @@ export const action = async ({ request }) => {
               defaultSmsDeviceId,
               defaultSmsSim,
               defaultWaAccount,
+              notificationChannel,
             },
           });
         } else {
@@ -486,6 +491,7 @@ export const action = async ({ request }) => {
               defaultSmsDeviceId,
               defaultSmsSim,
               defaultWaAccount,
+              notificationChannel,
             },
           });
         }
@@ -1101,6 +1107,46 @@ export default function Index() {
                       value="save-hoprelay-senders"
                     />
                     <s-stack direction="block" gap="base">
+                      <s-heading level="4">Notification channel</s-heading>
+                      <s-stack direction="block" gap="tight">
+                        <label>
+                          <input
+                            type="radio"
+                            name="notificationChannel"
+                            value="sms"
+                            defaultChecked={
+                              !hoprelaySettings?.notificationChannel ||
+                              hoprelaySettings.notificationChannel === "sms"
+                            }
+                          />{" "}
+                          SMS only
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="notificationChannel"
+                            value="whatsapp"
+                            defaultChecked={
+                              hoprelaySettings?.notificationChannel ===
+                              "whatsapp"
+                            }
+                          />{" "}
+                          WhatsApp only
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="notificationChannel"
+                            value="automatic"
+                            defaultChecked={
+                              hoprelaySettings?.notificationChannel ===
+                              "automatic"
+                            }
+                          />{" "}
+                          Automatic (SMS first, then WhatsApp)
+                        </label>
+                      </s-stack>
+
                       <s-heading level="4">Default SMS sender</s-heading>
                       {hoprelayDevices.length === 0 ? (
                         <s-text>

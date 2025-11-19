@@ -46,6 +46,7 @@ model HopRelaySettings {
   notifyOrderCreated     Boolean  @default(true)
   notifyOrderShipped     Boolean  @default(false)
   notifyOrderDelivered   Boolean  @default(false)
+  notificationChannel    String   @default("sms")
   orderCreatedTemplate   String?
   orderShippedTemplate   String?
   orderDeliveredTemplate String?

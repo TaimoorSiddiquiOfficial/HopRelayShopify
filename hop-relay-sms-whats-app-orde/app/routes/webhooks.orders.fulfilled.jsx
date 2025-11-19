@@ -68,13 +68,19 @@ export const action = async ({ request }) => {
       tracking_url: payload.order_status_url || "",
     });
 
-    const tasks = [];
+    const channelPreference = settings.notificationChannel || "sms";
 
-    if (
+    const smsConfigured =
       settings.smsEnabled &&
       settings.defaultSmsMode === "devices" &&
-      settings.defaultSmsDeviceId
-    ) {
+      settings.defaultSmsDeviceId;
+
+    const waConfigured =
+      settings.whatsappEnabled && settings.defaultWaAccount;
+
+    const tasks = [];
+
+    if (channelPreference === "sms" && smsConfigured) {
       tasks.push(
         sendHopRelaySms({
           secret: settings.hoprelayApiSecret,
@@ -87,9 +93,7 @@ export const action = async ({ request }) => {
           console.error("Failed to send HopRelay SMS for order fulfilled:", error);
         }),
       );
-    }
-
-    if (settings.whatsappEnabled && settings.defaultWaAccount) {
+    } else if (channelPreference === "whatsapp" && waConfigured) {
       tasks.push(
         sendHopRelayWhatsapp({
           secret: settings.hoprelayApiSecret,
@@ -103,6 +107,38 @@ export const action = async ({ request }) => {
           );
         }),
       );
+    } else if (channelPreference === "automatic") {
+      if (smsConfigured) {
+        tasks.push(
+          sendHopRelaySms({
+            secret: settings.hoprelayApiSecret,
+            mode: "devices",
+            phone,
+            message,
+            device: settings.defaultSmsDeviceId,
+            sim: settings.defaultSmsSim ?? undefined,
+          }).catch((error) => {
+            console.error(
+              "Failed to send HopRelay SMS for order fulfilled (automatic):",
+              error,
+            );
+          }),
+        );
+      } else if (waConfigured) {
+        tasks.push(
+          sendHopRelayWhatsapp({
+            secret: settings.hoprelayApiSecret,
+            account: settings.defaultWaAccount,
+            recipient: phone,
+            message,
+          }).catch((error) => {
+            console.error(
+              "Failed to send HopRelay WhatsApp for order fulfilled (automatic):",
+              error,
+            );
+          }),
+        );
+      }
     }
 
     if (tasks.length) {
