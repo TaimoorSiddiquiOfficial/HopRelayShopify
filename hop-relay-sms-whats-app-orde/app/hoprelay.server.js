@@ -503,12 +503,22 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       
       const html = await finalResp.text();
       
-      // Check if the page contains the user's email
+      // Log first 500 chars to see what's in the page
+      console.log('[verifyHopRelayUserPassword] Plugin page HTML preview:', html.substring(0, 500));
+      console.log('[verifyHopRelayUserPassword] Searching for email:', email);
+      console.log('[verifyHopRelayUserPassword] Email found in HTML:', html.includes(email));
+      console.log('[verifyHopRelayUserPassword] Email (lowercase) found:', html.toLowerCase().includes(email.toLowerCase()));
+      
+      // Check if the page contains the user's email (case-insensitive)
       // Valid sessions will show user info, invalid sessions won't
-      if (html.includes(email)) {
+      if (html.toLowerCase().includes(email.toLowerCase())) {
         console.log('[verifyHopRelayUserPassword] Password valid: true (email found in authenticated page)');
         return true;
       }
+      
+      // Also check if page contains common authenticated elements
+      const hasAuthElements = html.includes('user') || html.includes('account') || html.includes('dashboard');
+      console.log('[verifyHopRelayUserPassword] Page has auth elements:', hasAuthElements);
       
       console.log('[verifyHopRelayUserPassword] Password valid: false (email not found in page - invalid session)');
       return false;
