@@ -87,7 +87,10 @@ export async function createHopRelaySsoLink({
 
   console.log("SSO response:", json);
 
-  if (!response.ok || !json || !json.url) {
+  // Plugin returns: { status: 200, message: false, data: { url: "..." } }
+  const ssoUrl = json?.data?.url || json?.url;
+
+  if (!response.ok || !json || !ssoUrl) {
     const message =
       (json && json.message) || "HopRelay SSO link request failed.";
     console.error("SSO link generation failed:", { status: response.status, json });
@@ -96,7 +99,7 @@ export async function createHopRelaySsoLink({
     throw error;
   }
 
-  return json.url;
+  return ssoUrl;
 }
 
 export async function getHopRelayPackages() {
