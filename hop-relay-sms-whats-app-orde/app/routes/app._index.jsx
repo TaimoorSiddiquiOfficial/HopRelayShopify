@@ -86,9 +86,6 @@ export const loader = async ({ request }) => {
   let hoprelayDevices = [];
   let hoprelayWaAccounts = [];
   let hoprelaySendersError = null;
-  let hoprelayDashboardSsoUrl = null;
-  let hoprelayAndroidSsoUrl = null;
-  let hoprelayWhatsappSsoUrl = null;
 
   try {
     if (hoprelaySettings?.hoprelayApiSecret) {
@@ -101,32 +98,6 @@ export const loader = async ({ request }) => {
 
       hoprelayDevices = devices || [];
       hoprelayWaAccounts = waAccounts || [];
-
-      if (hoprelaySettings?.hoprelayUserId) {
-        try {
-          const [dashboardUrl, androidUrl, whatsappUrl] =
-            await Promise.all([
-              createHopRelaySsoLink({
-                userId: hoprelaySettings.hoprelayUserId,
-                redirect: "dashboard",
-              }),
-              createHopRelaySsoLink({
-                userId: hoprelaySettings.hoprelayUserId,
-                redirect: "dashboard/hosts/android",
-              }),
-              createHopRelaySsoLink({
-                userId: hoprelaySettings.hoprelayUserId,
-                redirect: "dashboard/hosts/whatsapp",
-              }),
-            ]);
-
-          hoprelayDashboardSsoUrl = dashboardUrl;
-          hoprelayAndroidSsoUrl = androidUrl;
-          hoprelayWhatsappSsoUrl = whatsappUrl;
-        } catch (error) {
-          console.error("Failed to create HopRelay SSO links:", error);
-        }
-      }
     }
   } catch (error) {
     hoprelaySendersError =
@@ -143,9 +114,6 @@ export const loader = async ({ request }) => {
     hoprelayDevices,
     hoprelayWaAccounts,
     hoprelaySendersError,
-    hoprelayDashboardSsoUrl,
-    hoprelayAndroidSsoUrl,
-    hoprelayWhatsappSsoUrl,
   };
 };
 
@@ -634,6 +602,42 @@ export const action = async ({ request }) => {
       }
     }
 
+    case "generate-sso-link": {
+      const redirect = formData.get("redirect") || "dashboard";
+      
+      try {
+        const settings = await prisma.hopRelaySettings.findUnique({
+          where: { shop: session.shop },
+        });
+
+        if (!settings?.hoprelayUserId) {
+          return {
+            ok: false,
+            type: "generate-sso-link",
+            error: "No HopRelay account linked.",
+          };
+        }
+
+        const ssoUrl = await createHopRelaySsoLink({
+          userId: settings.hoprelayUserId,
+          redirect,
+        });
+
+        return {
+          ok: true,
+          type: "generate-sso-link",
+          url: ssoUrl,
+        };
+      } catch (error) {
+        console.error("Failed to generate SSO link:", error);
+        return {
+          ok: false,
+          type: "generate-sso-link",
+          error: error.message || "Unable to generate SSO link.",
+        };
+      }
+    }
+
     default:
       return {
         ok: false,
@@ -654,9 +658,6 @@ export default function Index() {
     hoprelayDevices,
     hoprelayWaAccounts,
     hoprelaySendersError,
-    hoprelayDashboardSsoUrl,
-    hoprelayAndroidSsoUrl,
-    hoprelayWhatsappSsoUrl,
   } = useLoaderData();
 
   const createAccountFetcher = useFetcher();
@@ -1057,30 +1058,63 @@ export default function Index() {
 
             <s-stack direction="inline" gap="base">
               <s-button
-                target="_blank"
-                href={
-                  hoprelayDashboardSsoUrl ||
-                  "https://hoprelay.com/dashboard"
-                }
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData();
+                  formData.append("_action", "generate-sso-link");
+                  formData.append("redirect", "dashboard");
+                  const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    body: formData,
+                  });
+                  const result = await response.json();
+                  if (result.ok && result.url) {
+                    window.open(result.url, "_blank");
+                  } else {
+                    window.open("https://hoprelay.com/dashboard", "_blank");
+                  }
+                }}
               >
                 Open HopRelay dashboard
               </s-button>
               <s-button
-                target="_blank"
-                href={
-                  hoprelayAndroidSsoUrl ||
-                  "https://hoprelay.com/dashboard/hosts/android"
-                }
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData();
+                  formData.append("_action", "generate-sso-link");
+                  formData.append("redirect", "dashboard/hosts/android");
+                  const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    body: formData,
+                  });
+                  const result = await response.json();
+                  if (result.ok && result.url) {
+                    window.open(result.url, "_blank");
+                  } else {
+                    window.open("https://hoprelay.com/dashboard/hosts/android", "_blank");
+                  }
+                }}
                 variant="tertiary"
               >
                 Connect Android gateway
               </s-button>
               <s-button
-                target="_blank"
-                href={
-                  hoprelayWhatsappSsoUrl ||
-                  "https://hoprelay.com/dashboard/hosts/whatsapp"
-                }
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData();
+                  formData.append("_action", "generate-sso-link");
+                  formData.append("redirect", "dashboard/hosts/whatsapp");
+                  const response = await fetch(window.location.pathname, {
+                    method: "POST",
+                    body: formData,
+                  });
+                  const result = await response.json();
+                  if (result.ok && result.url) {
+                    window.open(result.url, "_blank");
+                  } else {
+                    window.open("https://hoprelay.com/dashboard/hosts/whatsapp", "_blank");
+                  }
+                }}
                 variant="tertiary"
               >
                 Add WhatsApp account
