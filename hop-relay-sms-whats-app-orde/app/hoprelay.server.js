@@ -545,6 +545,13 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
+  // If we got a valid session cookie AND a successful redirect (not to login),
+  // that's a strong indicator of successful authentication
+  if (looksLikeSuccessRedirect && location) {
+    console.log('[verifyHopRelayUserPassword] Password valid: true (session cookie + success redirect)');
+    return true;
+  }
+
   // Double-check by loading a protected page (/account/profile). If that page
   // redirects back to /auth/login, treat the password as invalid.
   const verifyWithSession = async (startUrl) => {
@@ -572,6 +579,21 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       );
 
       if (resp.status === 200) {
+        // Only check for logged-out content on protected pages, not homepage
+        const isHomepage = currentUrl === baseUrl || 
+                          currentUrl === baseUrl + '/' ||
+                          currentUrl === 'https://hoprelay.com' ||
+                          currentUrl === 'https://hoprelay.com/';
+        
+        if (isHomepage) {
+          // Reaching homepage with session cookie means successful login
+          console.log(
+            "[verifyHopRelayUserPassword] Password valid: true (homepage with valid session)",
+          );
+          return true;
+        }
+        
+        // For protected pages, check content
         try {
           const content = await resp.text();
           if (looksLoggedOut(content)) {
