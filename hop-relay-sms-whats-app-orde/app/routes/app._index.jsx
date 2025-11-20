@@ -9,6 +9,7 @@ import {
   createHopRelaySubscription,
   createHopRelayUser,
   deleteHopRelayApiKey,
+  deleteAllHopRelayApiKeys,
   getHopRelayPackages,
   findHopRelayUserByEmail,
   getHopRelayCredits,
@@ -76,7 +77,30 @@ export const loader = async ({ request }) => {
         currency: credits?.currency || null,
         planName: subscription?.name || hoprelaySettings.hoprelayPlanName,
         usage: subscription?.usage || null,
+        packageId: subscription?.package || hoprelaySettings.hoprelayPackageId,
       };
+
+      // Auto-sync active subscription to database
+      if (subscription?.package && subscription?.name) {
+        const needsUpdate = 
+          hoprelaySettings.hoprelayPackageId !== subscription.package ||
+          hoprelaySettings.hoprelayPlanName !== subscription.name;
+        
+        if (needsUpdate) {
+          await prisma.hopRelaySettings.update({
+            where: { shop: session.shop },
+            data: {
+              hoprelayPackageId: subscription.package,
+              hoprelayPlanName: subscription.name,
+            },
+          });
+          
+          // Refresh settings to show updated data
+          hoprelaySettings = await prisma.hopRelaySettings.findUnique({
+            where: { shop: session.shop },
+          });
+        }
+      }
     }
   } catch (error) {
     hoprelayAccountError =
@@ -563,20 +587,23 @@ export const action = async ({ request }) => {
             where: { shop: session.shop },
           })) || null;
 
-        if (!existing || !existing.hoprelayApiKeyId) {
+        if (!existing || !existing.hoprelayUserId) {
           return {
             ok: true,
             type: "revoke-hoprelay-apikey",
           };
         }
 
+        // Delete ALL API keys for this user from HopRelay backend
         try {
-          await deleteHopRelayApiKey({ id: existing.hoprelayApiKeyId });
+          const result = await deleteAllHopRelayApiKeys({ userId: existing.hoprelayUserId });
+          console.log(`Deleted ${result.deleted} API key(s) for user ${existing.hoprelayUserId}`);
         } catch (error) {
-          console.error("Failed to revoke HopRelay API key:", error);
+          console.error("Failed to delete API keys from HopRelay:", error);
           // Continue to clear local state even if remote delete fails.
         }
 
+        // Clear all API-related data from local database
         await prisma.hopRelaySettings.update({
           where: { shop: session.shop },
           data: {
@@ -987,12 +1014,26 @@ export default function Index() {
                     borderRadius="base"
                     background="subdued"
                   >
-                    <s-text>
-                      Your API secret (use in your Shopify integrations):
-                    </s-text>
-                    <pre style={{ margin: 0 }}>
-                      <code>{hoprelaySettings.hoprelayApiSecret}</code>
-                    </pre>
+                    <s-stack direction="block" gap="small">
+                      <s-text>
+                        Your API secret (keep this secure):
+                      </s-text>
+                      <s-stack direction="inline" gap="small" align="center">
+                        <pre style={{ margin: 0, flex: 1 }}>
+                          <code>••••••••••••••••••••{hoprelaySettings.hoprelayApiSecret.slice(-8)}</code>
+                        </pre>
+                        <s-button
+                          variant="secondary"
+                          size="small"
+                          onClick={() => {
+                            navigator.clipboard.writeText(hoprelaySettings.hoprelayApiSecret);
+                            shopify.toast.show('API secret copied to clipboard');
+                          }}
+                        >
+                          Copy
+                        </s-button>
+                      </s-stack>
+                    </s-stack>
                   </s-box>
                 )}
                 <revokeApiKeyFetcher.Form method="post">

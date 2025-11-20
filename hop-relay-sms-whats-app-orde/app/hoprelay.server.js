@@ -440,6 +440,22 @@ export async function sendHopRelayWhatsappBulk({
   return parseJsonResponse(response);
 }
 
+export async function getHopRelayApiKeys({ userId }) {
+  ensureSystemToken();
+
+  const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/apikeys`);
+  url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
+  url.searchParams.set("user", String(userId));
+  url.searchParams.set("limit", "100");
+
+  const response = await fetch(url, {
+    method: "GET",
+  });
+
+  const json = await parseJsonResponse(response);
+  return json.data || [];
+}
+
 export async function deleteHopRelayApiKey({ id }) {
   ensureSystemToken();
 
@@ -456,4 +472,32 @@ export async function deleteHopRelayApiKey({ id }) {
   );
 
   return parseJsonResponse(response);
+}
+
+export async function deleteAllHopRelayApiKeys({ userId }) {
+  ensureSystemToken();
+
+  try {
+    const apiKeys = await getHopRelayApiKeys({ userId });
+    
+    if (!apiKeys || apiKeys.length === 0) {
+      console.log(`No API keys found for user ${userId}`);
+      return { deleted: 0 };
+    }
+
+    const deletePromises = apiKeys.map((apiKey) =>
+      deleteHopRelayApiKey({ id: apiKey.id }).catch((error) => {
+        console.error(`Failed to delete API key ${apiKey.id}:`, error);
+        return null;
+      })
+    );
+
+    await Promise.all(deletePromises);
+    
+    console.log(`Deleted ${apiKeys.length} API key(s) for user ${userId}`);
+    return { deleted: apiKeys.length };
+  } catch (error) {
+    console.error(`Failed to delete all API keys for user ${userId}:`, error);
+    throw error;
+  }
 }
