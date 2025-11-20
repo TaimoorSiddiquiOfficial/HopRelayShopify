@@ -20,6 +20,7 @@ import {
   sendHopRelaySmsBulk,
   sendHopRelayWhatsappBulk,
   sendHopRelayPasswordReset,
+  verifyHopRelayUserPassword,
 } from "../hoprelay.server";
 
 export const loader = async ({ request }) => {
@@ -165,13 +166,25 @@ export const action = async ({ request }) => {
         let userId;
         let userEmail = email;
 
-        // If account already exists in HopRelay, just link it instead of creating a new one.
+        // Check if account already exists in HopRelay
         const existing = await findHopRelayUserByEmail(email);
 
         if (existing && existing.id !== undefined && existing.id !== null) {
+          // Account exists - verify password before linking
+          const isPasswordValid = await verifyHopRelayUserPassword({ email, password });
+          
+          if (!isPasswordValid) {
+            return {
+              ok: false,
+              type: "create-hoprelay-account",
+              error: "Account already exists with a different password. Please enter the correct password for your HopRelay.com account.",
+            };
+          }
+          
           userId = Number(existing.id);
           userEmail = existing.email || email;
         } else {
+          // Account doesn't exist - create new one
           const created = await createHopRelayUser({
             name,
             email,
