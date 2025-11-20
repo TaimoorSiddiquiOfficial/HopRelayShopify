@@ -311,38 +311,58 @@ export async function createHopRelayUser({ name, email, password }) {
       console.log('[createHopRelayUser] Login test result:', loginTest);
       
       if (loginTest) {
-        // Password is correct! Find the user and return their ID
-        console.log('[createHopRelayUser] Password verified! Finding user to get their ID...');
+        // Password is correct! Search for the user in the system
+        console.log('[createHopRelayUser] Password verified! Searching all users to find this email...');
         
-        // Try to find user by attempting login and parsing the response
-        const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
-        const loginForm = new FormData();
-        loginForm.set("email", email);
-        loginForm.set("password", password);
+        // Search through ALL users to find this email
+        let foundUser = null;
+        for (let page = 1; page <= 50; page++) {
+          const form = new FormData();
+          form.set("token", HOPRELAY_SYSTEM_TOKEN);
+          form.set("limit", "250");
+          form.set("page", String(page));
+
+          const userResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users`, {
+            method: "POST",
+            body: form,
+          });
+
+          const userJson = await parseJsonResponse(userResponse);
+          const users = userJson.data || [];
+          
+          console.log(`[createHopRelayUser] Searching page ${page}: ${users.length} users`);
+
+          if (users.length === 0) break;
+
+          foundUser = users.find(u => 
+            u.email && 
+            typeof u.email === 'string' && 
+            u.email.toLowerCase() === email.toLowerCase()
+          );
+
+          if (foundUser) {
+            console.log('[createHopRelayUser] Found user:', foundUser);
+            break;
+          }
+
+          if (users.length < 250) break;
+        }
         
-        const loginResponse = await fetch(`${baseUrl}/auth/login`, {
-          method: "POST",
-          body: loginForm,
-        });
-        
-        const loginJson = await loginResponse.json();
-        console.log('[createHopRelayUser] Login response:', loginJson);
-        
-        if (loginJson && loginJson.id) {
-          // Return the user data as if we created them
+        if (foundUser && foundUser.id) {
+          // Return the user data
           return {
-            id: loginJson.id,
-            email: loginJson.email || email,
+            id: foundUser.id,
+            email: foundUser.email || email,
           };
         }
         
-        throw new Error('Email already exists in HopRelay. Password is correct but unable to retrieve user ID. Please contact support.');
+        throw new Error('Password is correct but unable to find user in system. This might be a permissions issue. Please contact support.');
       } else {
         throw new Error('This email already exists in HopRelay, but the password is incorrect. Please use the "Send Password Reset Email" button below to recover your account.');
       }
     }
   } catch (e) {
-    if (e.message.includes('email already exists') || e.message.includes('password is incorrect')) {
+    if (e.message.includes('email already exists') || e.message.includes('password is incorrect') || e.message.includes('Password is correct')) {
       throw e; // Re-throw our custom error messages
     }
     console.error('[createHopRelayUser] Failed to parse response:', e);
