@@ -315,12 +315,13 @@ export async function createHopRelayUser({ name, email, password }) {
   form.set("name", name);
   form.set("email", email);
   form.set("password", password);
-  form.set("credits", "0");
   form.set("timezone", DEFAULT_TIMEZONE);
   form.set("country", DEFAULT_COUNTRY);
   form.set("language", DEFAULT_LANGUAGE_ID);
-  form.set("theme", "light");
-  form.set("role", DEFAULT_ROLE_ID);
+  // Optional fields - only send if needed
+  // form.set("credits", "0");
+  // form.set("theme", "light");
+  // form.set("role", DEFAULT_ROLE_ID);
 
   console.log('[createHopRelayUser] Creating user with:', { 
     name, 
