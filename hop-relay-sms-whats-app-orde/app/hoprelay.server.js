@@ -258,8 +258,24 @@ export async function createHopRelayUser({ name, email, password }) {
 
   console.log('[createHopRelayUser] Response status:', response.status);
   
-  const json = await parseJsonResponse(response);
-  console.log('[createHopRelayUser] Response:', JSON.stringify(json, null, 2));
+  let json;
+  try {
+    const text = await response.text();
+    console.log('[createHopRelayUser] Response text:', text);
+    json = JSON.parse(text);
+    console.log('[createHopRelayUser] Response JSON:', JSON.stringify(json, null, 2));
+  } catch (e) {
+    console.error('[createHopRelayUser] Failed to parse response:', e);
+    throw new Error('Failed to parse HopRelay response');
+  }
+  
+  if (!response.ok || (json && json.status && json.status !== 200)) {
+    const message = (json && json.message) || `HopRelay request failed with status ${response.status}`;
+    console.error('[createHopRelayUser] API Error:', message, json);
+    const error = new Error(message);
+    error.details = json;
+    throw error;
+  }
   
   if (!json.data || !json.data.id) {
     console.error('[createHopRelayUser] Invalid response - missing data.id:', json);
