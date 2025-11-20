@@ -397,6 +397,68 @@ export const action = async ({ request }) => {
       }
     }
 
+    case "save-hoprelay-manual-apikey": {
+      const manualApiKeyId = formData.get("manualApiKeyId") || "";
+      const manualApiSecret = formData.get("manualApiSecret") || "";
+      const manualApiKeyName = formData.get("manualApiKeyName") || "";
+
+      if (!manualApiKeyId || !manualApiSecret) {
+        return {
+          ok: false,
+          type: "save-hoprelay-manual-apikey",
+          error: "Both API Key ID and API Secret are required.",
+        };
+      }
+
+      try {
+        const existing =
+          (await prisma.hopRelaySettings.findUnique({
+            where: { shop: session.shop },
+          })) || null;
+
+        if (!existing) {
+          return {
+            ok: false,
+            type: "save-hoprelay-manual-apikey",
+            error: "Create a HopRelay account first.",
+          };
+        }
+
+        // Test the API key by trying to get credits
+        try {
+          await getHopRelayCredits({ secret: manualApiSecret });
+        } catch (testError) {
+          return {
+            ok: false,
+            type: "save-hoprelay-manual-apikey",
+            error: "Invalid API key. Please check your API Key ID and Secret.",
+          };
+        }
+
+        await prisma.hopRelaySettings.update({
+          where: { shop: session.shop },
+          data: {
+            hoprelayApiKeyId: Number(manualApiKeyId),
+            hoprelayApiKeyName: manualApiKeyName,
+            hoprelayApiSecret: manualApiSecret,
+          },
+        });
+
+        return {
+          ok: true,
+          type: "save-hoprelay-manual-apikey",
+          hoprelayApiKeyId: Number(manualApiKeyId),
+        };
+      } catch (error) {
+        console.error("Failed to save manual API key:", error);
+        return {
+          ok: false,
+          type: "save-hoprelay-manual-apikey",
+          error: error.message || "Unable to save API key.",
+        };
+      }
+    }
+
     case "save-hoprelay-notifications": {
       const orderCreatedTemplate =
         formData.get("orderCreatedTemplate") || "";
@@ -1288,6 +1350,50 @@ export default function Index() {
                 </s-stack>
               </createApiKeyFetcher.Form>
             )}
+            
+            {/* Manual API Key Input Section */}
+            <s-divider />
+            <s-stack direction="block" gap="base">
+              <s-heading level="3">Manual API Key Entry</s-heading>
+              <s-text variation="subdued" size="small">
+                If automatic API key creation fails, you can create an API key manually in your HopRelay.com dashboard and enter it here.
+              </s-text>
+              <createApiKeyFetcher.Form method="post">
+                <input
+                  type="hidden"
+                  name="_action"
+                  value="save-hoprelay-manual-apikey"
+                />
+                <s-stack direction="block" gap="base">
+                  <s-text-field
+                    label="API Key ID"
+                    name="manualApiKeyId"
+                    placeholder="Enter your API Key ID from HopRelay dashboard"
+                  />
+                  <s-text-field
+                    label="API Secret"
+                    name="manualApiSecret"
+                    type="password"
+                    placeholder="Enter your API Secret from HopRelay dashboard"
+                  />
+                  <s-text-field
+                    label="API Key Name"
+                    name="manualApiKeyName"
+                    value={`Shopify - ${shop.name}`}
+                  />
+                  <s-button
+                    type="submit"
+                    loading={
+                      ["loading", "submitting"].includes(
+                        createApiKeyFetcher.state,
+                      )
+                    }
+                  >
+                    Save Manual API Key
+                  </s-button>
+                </s-stack>
+              </createApiKeyFetcher.Form>
+            </s-stack>
           </s-section>
         </s-section>
       )}
