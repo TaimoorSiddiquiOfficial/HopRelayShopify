@@ -460,41 +460,55 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // CRITICAL: Verify session by checking if user's email appears in settings page
-  // Follow redirects to get to the actual settings page
+  // CRITICAL: Verify session by checking homepage for logout button
+  // HopRelay redirects /account/settings to homepage for logged-in users
   try {
-    const settingsResp = await fetch(`${baseUrl}/account/settings`, {
+    const homeResp = await fetch(`${baseUrl}/`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
       },
-      redirect: "follow", // Follow redirects to get final page
+      redirect: "follow",
     });
     
-    console.log('[verifyHopRelayUserPassword] Settings page final status:', settingsResp.status);
-    console.log('[verifyHopRelayUserPassword] Settings page final URL:', settingsResp.url);
+    console.log('[verifyHopRelayUserPassword] Homepage final status:', homeResp.status);
+    console.log('[verifyHopRelayUserPassword] Homepage final URL:', homeResp.url);
     
-    // If final URL is login page, session is invalid
-    if (settingsResp.url.includes('/auth/login')) {
+    // If redirected to login page, session is invalid
+    if (homeResp.url.includes('/auth/login')) {
       console.log('[verifyHopRelayUserPassword] Password valid: false (redirected to login page)');
       return false;
     }
     
-    // Settings page must return 200 OK
-    if (settingsResp.status !== 200) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (settings status:', settingsResp.status + ')');
+    // Homepage must return 200 OK
+    if (homeResp.status !== 200) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (homepage status:', homeResp.status + ')');
       return false;
     }
     
-    // Check if the user's email appears in the settings page HTML
-    const settingsHtml = await settingsResp.text();
+    // Check homepage HTML for logged-in state indicators
+    const homeHtml = await homeResp.text();
     
-    if (!settingsHtml.includes(email)) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (email not found in settings page)');
+    // Valid sessions should have logout link and NOT have login link in main content
+    const hasLogout = homeHtml.includes('/auth/logout') || homeHtml.includes('logout');
+    const hasLoginForm = homeHtml.includes('name="email"') && homeHtml.includes('name="password"');
+    
+    console.log('[verifyHopRelayUserPassword] Homepage has logout:', hasLogout);
+    console.log('[verifyHopRelayUserPassword] Homepage has login form:', hasLoginForm);
+    
+    // If homepage shows login form, session is invalid
+    if (hasLoginForm) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (homepage shows login form)');
       return false;
     }
     
-    console.log('[verifyHopRelayUserPassword] Password valid: true (email found in settings page)');
+    // Valid session must have logout option
+    if (!hasLogout) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (no logout link found)');
+      return false;
+    }
+    
+    console.log('[verifyHopRelayUserPassword] Password valid: true (valid session detected)');
     return true;
   } catch (e) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (settings check failed:', e.message + ')');
