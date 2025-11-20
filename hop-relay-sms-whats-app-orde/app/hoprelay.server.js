@@ -562,12 +562,10 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // Don't trust the redirect alone - even wrong passwords get redirected to homepage
-  // We MUST verify the session actually works by trying to fetch user's devices/data
-  
-  // Try to get user's devices list - this should only work with valid session
+  // Verify session by accessing account settings page and checking for user's email in HTML
+  // This is more reliable than API endpoints which may require additional auth
   try {
-    const devicesResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/devices/get`, {
+    const settingsResp = await fetch(`${baseUrl}/account/settings`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
@@ -575,60 +573,41 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       redirect: "manual",
     });
     
-    console.log('[verifyHopRelayUserPassword] Devices check status:', devicesResp.status);
-    const devicesLocation = devicesResp.headers.get('location');
-    console.log('[verifyHopRelayUserPassword] Devices redirect:', devicesLocation);
+    console.log('[verifyHopRelayUserPassword] Settings page status:', settingsResp.status);
+    const settingsLocation = settingsResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Settings redirect:', settingsLocation);
     
     // If redirects to login, session is invalid
-    if (isLoginRedirect(devicesLocation)) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (devices redirected to login)');
+    if (isLoginRedirect(settingsLocation)) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (settings redirected to login)');
       return false;
     }
     
-    // If we get 401/403, session is invalid
-    if (devicesResp.status === 401 || devicesResp.status === 403) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (devices returned', devicesResp.status + ')');
-      return false;
-    }
-    
-    // If we get 200, check the response
-    if (devicesResp.status === 200) {
+    // If we get 200, check if the page contains the user's email
+    if (settingsResp.status === 200) {
       try {
-        const devicesText = await devicesResp.text();
-        console.log('[verifyHopRelayUserPassword] Devices response preview:', devicesText.substring(0, 200));
+        const settingsHtml = await settingsResp.text();
+        console.log('[verifyHopRelayUserPassword] Settings page loaded, checking for email...');
         
-        // Check if it's a login page
-        if (looksLoggedOut(devicesText)) {
-          console.log('[verifyHopRelayUserPassword] Password valid: false (devices response looks like login page)');
+        // Check if it looks like a login page
+        if (looksLoggedOut(settingsHtml)) {
+          console.log('[verifyHopRelayUserPassword] Password valid: false (settings page looks like login)');
           return false;
         }
         
-        // Try to parse as JSON
-        try {
-          const devicesData = JSON.parse(devicesText);
-          
-          // Check if JSON response indicates unauthorized
-          if (devicesData.status === 401 || devicesData.status === 403) {
-            console.log('[verifyHopRelayUserPassword] Password valid: false (devices JSON status:', devicesData.status + ')');
-            return false;
-          }
-          
-          // Check if response has successful status (200) - means authenticated
-          if (devicesData.status === 200) {
-            console.log('[verifyHopRelayUserPassword] Password valid: true (devices API returned status 200)');
-            return true;
-          }
-          
-          console.log('[verifyHopRelayUserPassword] Devices response status:', devicesData.status);
-        } catch (jsonErr) {
-          console.log('[verifyHopRelayUserPassword] Devices response not valid JSON');
+        // Check if the user's email appears in the settings page
+        if (settingsHtml.includes(email)) {
+          console.log('[verifyHopRelayUserPassword] Password valid: true (email found in settings page)');
+          return true;
         }
+        
+        console.log('[verifyHopRelayUserPassword] Email not found in settings page, checking profile...');
       } catch (e) {
-        console.log('[verifyHopRelayUserPassword] Error reading devices response:', e);
+        console.log('[verifyHopRelayUserPassword] Error reading settings page:', e);
       }
     }
   } catch (e) {
-    console.log('[verifyHopRelayUserPassword] Devices check failed:', e);
+    console.log('[verifyHopRelayUserPassword] Settings check failed:', e);
   }
 
   // Fallback: Double-check by loading a protected page (/account/profile). If that page
