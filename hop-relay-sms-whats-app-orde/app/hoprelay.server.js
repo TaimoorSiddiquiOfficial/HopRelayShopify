@@ -47,6 +47,36 @@ async function parseJsonResponse(response) {
   return json;
 }
 
+async function fetchHopRelayApiWithSecret(endpoint, secret) {
+  const apiUrl = `${HOPRELAY_API_BASE_URL}${endpoint}`;
+
+  const form = new FormData();
+  form.set("secret", secret);
+
+  const postResponse = await fetch(apiUrl, {
+    method: "POST",
+    body: form,
+  });
+
+  try {
+    return await parseJsonResponse(postResponse);
+  } catch (error) {
+    // Some endpoints might only accept GET. Fall back to GET for compatibility.
+    if (postResponse.status !== 405 && postResponse.status !== 404) {
+      throw error;
+    }
+
+    const url = new URL(apiUrl);
+    url.searchParams.set("secret", secret);
+
+    const getResponse = await fetch(url, {
+      method: "GET",
+    });
+
+    return parseJsonResponse(getResponse);
+  }
+}
+
 export async function createHopRelaySsoLink({
   userId,
   redirect = "dashboard",
@@ -75,8 +105,8 @@ export async function createHopRelaySsoLink({
   }
 
   // Plugin endpoints live at the root, not under /admin.
-  // Extract base domain from HOPRELAY_ADMIN_BASE_URL
-  const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  // Extract base domain from configured web base (or admin fallback)
+  const baseUrl = HOPRELAY_WEB_BASE_URL;
   const url = new URL(`${baseUrl}/plugin`);
   url.searchParams.set("name", "shopify-sso");
   url.searchParams.set("action", "sso_link");
@@ -115,16 +145,30 @@ export async function createHopRelaySsoLink({
   // Validate SSO URL: must be HTTPS and from hoprelay.com domain
   try {
     const urlObj = new URL(ssoUrl);
-    const allowedDomains = ["hoprelay.com", "www.hoprelay.com"];
-    
-    if (!allowedDomains.includes(urlObj.hostname)) {
+    const allowedDomains = new Set(["hoprelay.com", "www.hoprelay.com"]);
+
+    // Allow hostnames derived from configured admin/web base URLs
+    [HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, ""), HOPRELAY_WEB_BASE_URL].forEach(
+      (base) => {
+        try {
+          const host = new URL(base).hostname;
+          if (host) allowedDomains.add(host);
+        } catch (e) {
+          // ignore invalid base URLs
+        }
+      },
+    );
+
+    const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(urlObj.hostname);
+
+    if (!allowedDomains.has(urlObj.hostname)) {
       console.error("SSO URL from unauthorized domain:", urlObj.hostname);
       throw new Error("Invalid SSO URL domain");
     }
-    
-    // Enforce HTTPS in production (allow HTTP for local development)
-    if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
-      console.error("Invalid SSO URL protocol:", urlObj.protocol);
+
+    // Enforce HTTPS except for local development hosts
+    if (urlObj.protocol !== "https:" && !(isLocalHost && urlObj.protocol === "http:")) {
+      console.error("Invalid SSO URL protocol for host:", urlObj.protocol, urlObj.hostname);
       throw new Error("Invalid SSO URL protocol");
     }
   } catch (error) {
@@ -152,50 +196,22 @@ export async function getHopRelayPackages() {
 }
 
 export async function getHopRelayCredits({ secret }) {
-  const url = new URL(`${HOPRELAY_API_BASE_URL}/get/credits`);
-  url.searchParams.set("secret", secret);
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  const json = await parseJsonResponse(response);
+  const json = await fetchHopRelayApiWithSecret("/get/credits", secret);
   return json.data || null;
 }
 
 export async function getHopRelaySubscription({ secret }) {
-  const url = new URL(`${HOPRELAY_API_BASE_URL}/get/subscription`);
-  url.searchParams.set("secret", secret);
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  const json = await parseJsonResponse(response);
+  const json = await fetchHopRelayApiWithSecret("/get/subscription", secret);
   return json.data || null;
 }
 
 export async function getHopRelayDevices({ secret }) {
-  const url = new URL(`${HOPRELAY_API_BASE_URL}/get/devices`);
-  url.searchParams.set("secret", secret);
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  const json = await parseJsonResponse(response);
+  const json = await fetchHopRelayApiWithSecret("/get/devices", secret);
   return json.data || [];
 }
 
 export async function getHopRelayWaAccounts({ secret }) {
-  const url = new URL(`${HOPRELAY_API_BASE_URL}/get/wa.accounts`);
-  url.searchParams.set("secret", secret);
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  const json = await parseJsonResponse(response);
+  const json = await fetchHopRelayApiWithSecret("/get/wa.accounts", secret);
   return json.data || [];
 }
 
@@ -205,16 +221,18 @@ export async function findHopRelayUserByEmail(email) {
   const target = String(email || "").toLowerCase();
   console.log('[findHopRelayUserByEmail] Searching for:', target);
 
-  // Search through multiple pages to find the user
-  for (let page = 1; page <= 10; page++) {
-    const form = new FormData();
-    form.set("token", HOPRELAY_SYSTEM_TOKEN);
-    form.set("limit", "250");
-    form.set("page", String(page));
+  const pageLimit = 250;
+  const maxPages = 200; // safety guard to avoid infinite loops
 
-    const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users`, {
-      method: "POST",
-      body: form,
+  // Search through multiple pages to find the user
+  for (let page = 1; page <= maxPages; page++) {
+    const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
+    url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
+    url.searchParams.set("limit", String(pageLimit));
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url, {
+      method: "GET",
     });
 
     const json = await parseJsonResponse(response);
@@ -242,8 +260,8 @@ export async function findHopRelayUserByEmail(email) {
       return found;
     }
 
-    // If we got less than 250 users, we've reached the end
-    if (users.length < 250) {
+    // If we got less than the page limit, we've reached the end
+    if (users.length < pageLimit) {
       break;
     }
   }
