@@ -407,28 +407,53 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
 
+  // First attempt - check initial response
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     body: form,
-    redirect: 'manual', // Don't follow redirects
+    redirect: 'manual',
   });
 
   console.log('[verifyHopRelayUserPassword] Response status:', response.status);
   
-  // Check the redirect location to determine if login was successful
   const location = response.headers.get('location');
   console.log('[verifyHopRelayUserPassword] Redirect location:', location);
   
-  // Successful login redirects to homepage (//hoprelay.com or /), 
-  // Failed login redirects back to /auth/login with error parameter
-  const isValid = response.status === 302 && 
-                  location && 
-                  !location.includes('/auth/login') && 
-                  !location.includes('error=');
+  // Check if we got a session cookie - successful login sets PHPSESSID
+  const cookies = response.headers.get('set-cookie');
+  console.log('[verifyHopRelayUserPassword] Set-Cookie header:', cookies);
   
-  console.log('[verifyHopRelayUserPassword] Password valid:', isValid);
+  // If redirecting to auth/login, it's definitely a failure
+  if (location && location.includes('/auth/login')) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (redirect to login)');
+    return false;
+  }
   
-  return isValid;
+  // If we have a session cookie and redirect to homepage, follow it to verify
+  if (response.status === 302 && cookies && cookies.includes('PHPSESSID')) {
+    console.log('[verifyHopRelayUserPassword] Got session cookie, following redirect to verify...');
+    
+    // Follow the redirect with the session cookie
+    const followResponse = await fetch(`${baseUrl}${location.replace(/^\/\/[^\/]+/, '')}`, {
+      headers: {
+        'Cookie': cookies.split(';')[0], // Use the PHPSESSID cookie
+      },
+    });
+    
+    const pageContent = await followResponse.text();
+    console.log('[verifyHopRelayUserPassword] Page content length:', pageContent.length);
+    
+    // Check if we're logged in by looking for dashboard elements or logout link
+    const isLoggedIn = pageContent.includes('logout') || 
+                       pageContent.includes('dashboard') || 
+                       pageContent.includes('account/profile');
+    
+    console.log('[verifyHopRelayUserPassword] Password valid:', isLoggedIn);
+    return isLoggedIn;
+  }
+  
+  console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
+  return false;
 }
 
 export async function createHopRelaySubscription({
