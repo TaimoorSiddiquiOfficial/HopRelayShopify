@@ -438,27 +438,36 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       body: form,
     });
     
-    console.log('[verifyHopRelayUserPassword] API auth response status:', response.status);
+    console.log('[verifyHopRelayUserPassword] API auth HTTP status:', response.status);
     
-    const json = await parseJsonResponse(response);
+    // Parse JSON without throwing error
+    let json;
+    try {
+      json = await response.json();
+    } catch (error) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (unable to parse JSON response)');
+      return false;
+    }
     
-    console.log('[verifyHopRelayUserPassword] API auth response:', JSON.stringify({
+    console.log('[verifyHopRelayUserPassword] API auth JSON response:', JSON.stringify({
       status: json.status,
       message: json.message,
       hasData: !!json.data,
-      hasSecret: json.data && !!json.data.secret
+      hasSecret: json.data && !!json.data.secret,
+      dataKeys: json.data ? Object.keys(json.data) : []
     }));
     
-    // Valid credentials return status 200 with user data including secret key
-    if (json.status === 200 && json.data && json.data.secret) {
+    // Valid credentials return data with secret key
+    // Check both json.status === 200 AND response.ok
+    if (response.ok && json && json.data && json.data.secret) {
       console.log('[verifyHopRelayUserPassword] Password valid: true (API returned user secret)');
       return true;
     }
     
-    console.log('[verifyHopRelayUserPassword] Password valid: false (API did not return user secret)');
+    console.log('[verifyHopRelayUserPassword] Password valid: false (API did not return valid user data)');
     return false;
   } catch (error) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (API auth failed:', error.message + ')');
+    console.log('[verifyHopRelayUserPassword] Password valid: false (API request exception:', error.message + ')');
     return false;
   }
 }
