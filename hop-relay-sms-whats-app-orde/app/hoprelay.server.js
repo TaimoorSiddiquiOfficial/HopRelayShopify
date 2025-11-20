@@ -55,10 +55,14 @@ export async function createHopRelaySsoLink({
     return null;
   }
 
-  ensureSystemToken();
+  if (!userId) {
+    return null;
+  }
 
-  // Plugin endpoints live under /plugin, not /admin.
-  const url = new URL(`${HOPRELAY_WEB_BASE_URL}/plugin`);
+  // Plugin endpoints live at the root, not under /admin.
+  // Extract base domain from HOPRELAY_ADMIN_BASE_URL
+  const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  const url = new URL(`${baseUrl}/plugin`);
   url.searchParams.set("name", "shopify-sso");
   url.searchParams.set("action", "sso_link");
   url.searchParams.set("user", String(userId));
