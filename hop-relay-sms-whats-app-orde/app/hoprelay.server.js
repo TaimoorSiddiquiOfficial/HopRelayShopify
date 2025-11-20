@@ -240,15 +240,26 @@ export async function createHopRelayUser({ name, email, password }) {
   form.set("theme", "light");
   form.set("role", DEFAULT_ROLE_ID);
 
-  console.log('[createHopRelayUser] Creating user with:', { name, email, hasPassword: !!password });
+  console.log('[createHopRelayUser] Creating user with:', { 
+    name, 
+    email, 
+    hasPassword: !!password,
+    timezone: DEFAULT_TIMEZONE,
+    country: DEFAULT_COUNTRY,
+    language: DEFAULT_LANGUAGE_ID,
+    role: DEFAULT_ROLE_ID,
+    url: `${HOPRELAY_ADMIN_BASE_URL}/create/user`
+  });
 
   const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
     method: "POST",
     body: form,
   });
 
+  console.log('[createHopRelayUser] Response status:', response.status);
+  
   const json = await parseJsonResponse(response);
-  console.log('[createHopRelayUser] Response:', json);
+  console.log('[createHopRelayUser] Response:', JSON.stringify(json, null, 2));
   
   if (!json.data || !json.data.id) {
     console.error('[createHopRelayUser] Invalid response - missing data.id:', json);
