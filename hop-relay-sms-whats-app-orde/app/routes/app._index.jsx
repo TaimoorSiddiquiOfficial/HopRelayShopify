@@ -1014,26 +1014,12 @@ export default function Index() {
                     borderRadius="base"
                     background="subdued"
                   >
-                    <s-stack direction="block" gap="small">
-                      <s-text>
-                        Your API secret (keep this secure):
-                      </s-text>
-                      <s-stack direction="inline" gap="small" align="center">
-                        <pre style={{ margin: 0, flex: 1 }}>
-                          <code>••••••••••••••••••••{hoprelaySettings.hoprelayApiSecret.slice(-8)}</code>
-                        </pre>
-                        <s-button
-                          variant="secondary"
-                          size="small"
-                          onClick={() => {
-                            navigator.clipboard.writeText(hoprelaySettings.hoprelayApiSecret);
-                            shopify.toast.show('API secret copied to clipboard');
-                          }}
-                        >
-                          Copy
-                        </s-button>
-                      </s-stack>
-                    </s-stack>
+                    <s-text>
+                      Your API secret (use in your Shopify integrations):
+                    </s-text>
+                    <pre style={{ margin: 0 }}>
+                      <code>{hoprelaySettings.hoprelayApiSecret}</code>
+                    </pre>
                   </s-box>
                 )}
                 <revokeApiKeyFetcher.Form method="post">
