@@ -417,12 +417,51 @@ export async function sendHopRelayPasswordReset({ email }) {
 }
 
 export async function verifyHopRelayUserPassword({ email, password }) {
+  // Use Admin API to verify password - this is the most reliable method
+  try {
+    const form = new FormData();
+    form.set("email", email);
+    form.set("password", password);
+    
+    console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
+    
+    const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/auth/verify`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HOPRELAY_SYSTEM_TOKEN}`,
+      },
+      body: form,
+    });
+    
+    console.log('[verifyHopRelayUserPassword] Admin API response status:', response.status);
+    
+    if (response.status === 200) {
+      try {
+        const result = await response.json();
+        console.log('[verifyHopRelayUserPassword] Admin API result:', result);
+        
+        if (result.status === 200 && result.data && result.data.valid === true) {
+          console.log('[verifyHopRelayUserPassword] Password valid: true (Admin API verified)');
+          return true;
+        }
+      } catch (e) {
+        console.log('[verifyHopRelayUserPassword] Failed to parse Admin API response:', e);
+      }
+    }
+    
+    console.log('[verifyHopRelayUserPassword] Password valid: false (Admin API rejected)');
+    return false;
+  } catch (e) {
+    console.log('[verifyHopRelayUserPassword] Admin API verification failed, falling back to web verification:', e);
+  }
+  
+  // Fallback to original web-based verification
   const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
   const form = new FormData();
   form.set("email", email);
   form.set("password", password);
 
-  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
+  console.log('[verifyHopRelayUserPassword] Verifying password via web for:', email);
 
   const isLoginRedirect = (loc) =>
     !!loc && typeof loc === "string" && loc.includes("/auth/login");
