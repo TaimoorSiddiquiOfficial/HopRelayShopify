@@ -430,23 +430,29 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   const looksLoggedIn = (content) => {
     const lower = content.toLowerCase();
-    if (
+
+    // Clear logout/login markers
+    const hasLogout =
+      lower.includes("logout") ||
+      lower.includes("log out") ||
+      lower.includes("/logout") ||
+      lower.includes("account/profile");
+
+    const looksLoggedOut =
       lower.includes("invalid credentials") ||
-      lower.includes("password is incorrect")
-    ) {
+      lower.includes("password is incorrect") ||
+      lower.includes("auth/login") ||
+      lower.includes("signin") ||
+      lower.includes("sign in") ||
+      lower.includes(">login<") ||
+      lower.includes("login\"");
+
+    if (looksLoggedOut) {
       return false;
     }
-    // Success markers
-    if (
-      lower.includes("logout") ||
-      lower.includes("dashboard") ||
-      lower.includes("account/profile") ||
-      lower.includes(email.toLowerCase())
-    ) {
-      return true;
-    }
-    // Unknown page, treat as not logged in
-    return false;
+
+    // Only treat as logged in if we see explicit logout/profile markers.
+    return hasLogout;
   };
 
   // Submit login without following redirects so we can inspect the outcome
