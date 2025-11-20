@@ -425,11 +425,11 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
 
-  // First attempt - check initial response
+  // Submit login without following redirects so we can inspect the outcome
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     body: form,
-    redirect: 'manual',
+    redirect: "manual",
   });
 
   console.log('[verifyHopRelayUserPassword] Response status:', response.status);
@@ -441,36 +441,59 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   const cookies = response.headers.get('set-cookie');
   console.log('[verifyHopRelayUserPassword] Set-Cookie header:', cookies);
   
-  // If redirecting to auth/login, it's definitely a failure
+  // If redirecting back to login, it's definitely a failure
   if (location && location.includes('/auth/login')) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (redirect to login)');
     return false;
   }
-  
-  // If we have a session cookie and redirect to homepage, follow it to verify
-  if (response.status === 302 && cookies && cookies.includes('PHPSESSID')) {
-    console.log('[verifyHopRelayUserPassword] Got session cookie, following redirect to verify...');
-    
-    // Follow the redirect with the session cookie
-    const followResponse = await fetch(`${baseUrl}${location.replace(/^\/\/[^\/]+/, '')}`, {
-      headers: {
-        'Cookie': cookies.split(';')[0], // Use the PHPSESSID cookie
-      },
-    });
-    
-    const pageContent = await followResponse.text();
-    console.log('[verifyHopRelayUserPassword] Page content length:', pageContent.length);
-    
-    // Check if we're logged in by looking for dashboard elements or logout link
-    const isLoggedIn = pageContent.includes('logout') || 
-                       pageContent.includes('dashboard') || 
-                       pageContent.includes('account/profile');
-    
+
+  // Require a PHPSESSID cookie to attempt session verification
+  const sessionCookie = cookies ? cookies.split(';')[0] : null;
+  if (!sessionCookie || !sessionCookie.startsWith('PHPSESSID=')) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (no PHPSESSID cookie)');
+    return false;
+  }
+
+  // Verify by loading a protected page (/account/profile). If it redirects to login or lacks auth markers, treat as failure.
+  console.log('[verifyHopRelayUserPassword] Got session cookie, verifying against /account/profile...');
+  const profileResponse = await fetch(`${baseUrl}/account/profile`, {
+    method: "GET",
+    headers: {
+      Cookie: sessionCookie,
+    },
+    redirect: "manual",
+  });
+
+  const profileLocation = profileResponse.headers.get('location');
+  console.log('[verifyHopRelayUserPassword] Profile status:', profileResponse.status, 'location:', profileLocation);
+
+  // If profile access bounces to login, credentials are invalid
+  if (
+    (profileResponse.status === 302 || profileResponse.status === 301) &&
+    profileLocation &&
+    profileLocation.includes('/auth/login')
+  ) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (profile redirect to login)');
+    return false;
+  }
+
+  // If we reach profile, examine content for signs of being logged out
+  if (profileResponse.status === 200) {
+    const pageContent = await profileResponse.text();
+    console.log('[verifyHopRelayUserPassword] Profile page content length:', pageContent.length);
+
+    const looksLoggedOut =
+      pageContent.toLowerCase().includes('auth/login') ||
+      pageContent.toLowerCase().includes('invalid credentials') ||
+      pageContent.toLowerCase().includes('password is incorrect');
+
+    const isLoggedIn = !looksLoggedOut;
     console.log('[verifyHopRelayUserPassword] Password valid:', isLoggedIn);
     return isLoggedIn;
   }
-  
-  console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
+
+  // Any other outcome is treated as failure
+  console.log('[verifyHopRelayUserPassword] Password valid: false (unexpected profile response)');
   return false;
 }
 
