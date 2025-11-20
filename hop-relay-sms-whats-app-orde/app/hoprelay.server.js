@@ -463,6 +463,11 @@ export async function createHopRelayApiKey({
 }) {
   ensureSystemToken();
 
+  // Check if this is a placeholder user ID (from Admin API permission workaround)
+  if (userId === 999999) {
+    throw new Error('Cannot create API key automatically due to Admin API permissions. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+  }
+
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("id", String(userId));
