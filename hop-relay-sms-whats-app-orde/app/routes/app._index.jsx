@@ -1012,20 +1012,41 @@ export default function Index() {
                 <s-text variation="subdued" size="small">
                   Forgot your HopRelay.com password? Click below to receive a password reset email.
                 </s-text>
-                <resetPasswordFetcher.Form method="post">
-                  <input type="hidden" name="_action" value="reset-password" />
-                  <s-button
-                    type="submit"
-                    variant="secondary"
-                    loading={
-                      ["loading", "submitting"].includes(
-                        resetPasswordFetcher.state,
-                      )
-                    }
-                  >
-                    Reset Password
-                  </s-button>
-                </resetPasswordFetcher.Form>
+                <s-stack direction="inline" gap="base">
+                  <resetPasswordFetcher.Form method="post">
+                    <input type="hidden" name="_action" value="reset-password" />
+                    <s-button
+                      type="submit"
+                      variant="secondary"
+                      loading={
+                        ["loading", "submitting"].includes(
+                          resetPasswordFetcher.state,
+                        )
+                      }
+                    >
+                      Reset Password
+                    </s-button>
+                  </resetPasswordFetcher.Form>
+                  <disconnectAccountFetcher.Form method="post">
+                    <input type="hidden" name="_action" value="disconnect-hoprelay-account" />
+                    <s-button
+                      type="submit"
+                      variant="secondary"
+                      tone="critical"
+                      loading={
+                        ["loading", "submitting"].includes(
+                          disconnectAccountFetcher.state,
+                        )
+                      }
+                    >
+                      Disconnect Account
+                    </s-button>
+                  </disconnectAccountFetcher.Form>
+                </s-stack>
+                <s-text variation="subdued" size="small">
+                  <strong>Note:</strong> If you created this account with a different password than your HopRelay.com account, 
+                  disconnect and reconnect using your correct HopRelay.com password.
+                </s-text>
               </s-stack>
             </s-section>
           )}
