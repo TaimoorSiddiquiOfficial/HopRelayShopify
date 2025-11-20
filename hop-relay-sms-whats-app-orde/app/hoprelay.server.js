@@ -483,16 +483,12 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     try {
       pluginData = await pluginResp.json();
     } catch (e) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (invalid plugin response)');
+      console.log('[verifyHopRelayUserPassword] Password valid: false (invalid JSON response)');
       return false;
     }
     
-    console.log('[verifyHopRelayUserPassword] Plugin response:', JSON.stringify({
-      status: pluginData.status,
-      hasData: !!pluginData.data,
-      hasUserId: pluginData.data && !!pluginData.data.id,
-      hasEmail: pluginData.data && !!pluginData.data.email
-    }));
+    // Log full plugin response for debugging
+    console.log('[verifyHopRelayUserPassword] Plugin response (full):', JSON.stringify(pluginData));
     
     // Valid password returns user data with matching email
     if (pluginData.status === 200 && 
