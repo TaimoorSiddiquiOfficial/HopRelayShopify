@@ -461,22 +461,22 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
   // CRITICAL: Verify session by checking if user's email appears in settings page
-  // This is the ONLY reliable way to verify password is correct
+  // Follow redirects to get to the actual settings page
   try {
     const settingsResp = await fetch(`${baseUrl}/account/settings`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
       },
-      redirect: "manual",
+      redirect: "follow", // Follow redirects to get final page
     });
     
-    console.log('[verifyHopRelayUserPassword] Settings page status:', settingsResp.status);
-    const settingsLocation = settingsResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Settings page final status:', settingsResp.status);
+    console.log('[verifyHopRelayUserPassword] Settings page final URL:', settingsResp.url);
     
-    // If settings page redirects anywhere, session is invalid
-    if (settingsLocation) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (settings redirected to:', settingsLocation + ')');
+    // If final URL is login page, session is invalid
+    if (settingsResp.url.includes('/auth/login')) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (redirected to login page)');
       return false;
     }
     
