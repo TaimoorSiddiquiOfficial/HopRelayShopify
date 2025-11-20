@@ -418,6 +418,7 @@ export async function sendHopRelayPasswordReset({ email }) {
 
 export async function verifyHopRelayUserPassword({ email, password }) {
   const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  const emailLower = String(email || "").toLowerCase();
   
   const form = new FormData();
   form.set("email", email);
@@ -451,8 +452,8 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       return false;
     }
 
-    // Only treat as logged in if we see explicit logout/profile markers.
-    return hasLogout;
+    // Only treat as logged in if we see explicit logout/profile markers AND the email we logged in with.
+    return hasLogout && (emailLower && lower.includes(emailLower));
   };
 
   // Submit login without following redirects so we can inspect the outcome
