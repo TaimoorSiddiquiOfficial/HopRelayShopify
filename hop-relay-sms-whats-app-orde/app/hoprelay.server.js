@@ -425,6 +425,26 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
 
+  const isLoginRedirect = (loc) =>
+    !!loc && typeof loc === "string" && loc.includes("/auth/login");
+
+  const looksLoggedIn = (content) => {
+    const lower = content.toLowerCase();
+    if (
+      lower.includes("auth/login") ||
+      lower.includes("invalid credentials") ||
+      lower.includes("password is incorrect")
+    ) {
+      return false;
+    }
+    return (
+      lower.includes("logout") ||
+      lower.includes("dashboard") ||
+      lower.includes("account/profile") ||
+      lower.includes("hoprelay")
+    );
+  };
+
   // Submit login without following redirects so we can inspect the outcome
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
@@ -442,7 +462,7 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Set-Cookie header:', cookies);
   
   // If redirecting back to login, it's definitely a failure
-  if (location && location.includes('/auth/login')) {
+  if (isLoginRedirect(location)) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (redirect to login)');
     return false;
   }
@@ -470,26 +490,51 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   // If profile access bounces to login, credentials are invalid
   if (
     (profileResponse.status === 302 || profileResponse.status === 301) &&
-    profileLocation &&
-    profileLocation.includes('/auth/login')
+    isLoginRedirect(profileLocation)
   ) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (profile redirect to login)');
     return false;
   }
 
-  // If we reach profile, examine content for signs of being logged out
+  // If profile is OK, check content
   if (profileResponse.status === 200) {
     const pageContent = await profileResponse.text();
     console.log('[verifyHopRelayUserPassword] Profile page content length:', pageContent.length);
-
-    const looksLoggedOut =
-      pageContent.toLowerCase().includes('auth/login') ||
-      pageContent.toLowerCase().includes('invalid credentials') ||
-      pageContent.toLowerCase().includes('password is incorrect');
-
-    const isLoggedIn = !looksLoggedOut;
-    console.log('[verifyHopRelayUserPassword] Password valid:', isLoggedIn);
+    const isLoggedIn = looksLoggedIn(pageContent);
+    console.log('[verifyHopRelayUserPassword] Password valid (profile 200):', isLoggedIn);
     return isLoggedIn;
+  }
+
+  // If profile redirects elsewhere (e.g., homepage/dashboard), follow once and validate
+  if (
+    (profileResponse.status === 302 || profileResponse.status === 301) &&
+    profileLocation
+  ) {
+    const followUrl = new URL(profileLocation, baseUrl).toString();
+    console.log('[verifyHopRelayUserPassword] Following redirect to verify:', followUrl);
+
+    const followResponse = await fetch(followUrl, {
+      method: "GET",
+      headers: {
+        Cookie: sessionCookie,
+      },
+      redirect: "manual",
+    });
+
+    const followLocation = followResponse.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Follow status:', followResponse.status, 'location:', followLocation);
+
+    if (isLoginRedirect(followLocation)) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (follow redirect to login)');
+      return false;
+    }
+
+    if (followResponse.status === 200) {
+      const followContent = await followResponse.text();
+      const isLoggedIn = looksLoggedIn(followContent);
+      console.log('[verifyHopRelayUserPassword] Password valid (follow 200):', isLoggedIn);
+      return isLoggedIn;
+    }
   }
 
   // Any other outcome is treated as failure
