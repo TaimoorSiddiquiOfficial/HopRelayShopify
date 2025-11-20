@@ -52,10 +52,12 @@ export async function createHopRelaySsoLink({
   redirect = "dashboard",
 } = {}) {
   if (!HOPRELAY_SSO_PLUGIN_TOKEN) {
+    console.error("HOPRELAY_SSO_PLUGIN_TOKEN is not set");
     return null;
   }
 
   if (!userId) {
+    console.error("userId is required for SSO link generation");
     return null;
   }
 
@@ -69,6 +71,8 @@ export async function createHopRelaySsoLink({
   url.searchParams.set("token", HOPRELAY_SSO_PLUGIN_TOKEN);
   url.searchParams.set("redirect", redirect);
 
+  console.log("Creating SSO link:", url.toString());
+
   const response = await fetch(url.toString(), {
     method: "GET",
   });
@@ -77,12 +81,16 @@ export async function createHopRelaySsoLink({
   try {
     json = await response.json();
   } catch (error) {
+    console.error("Failed to parse SSO response:", error);
     throw new Error("Unable to parse HopRelay SSO response.");
   }
+
+  console.log("SSO response:", json);
 
   if (!response.ok || !json || !json.url) {
     const message =
       (json && json.message) || "HopRelay SSO link request failed.";
+    console.error("SSO link generation failed:", { status: response.status, json });
     const error = new Error(message);
     error.details = json;
     throw error;
