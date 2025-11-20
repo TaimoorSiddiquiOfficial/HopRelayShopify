@@ -603,14 +603,29 @@ export async function verifyHopRelayUserPassword({ email, password }) {
           return false;
         }
         
-        // Try to parse as JSON and verify email matches
+        // Try to parse as JSON and check status field
         try {
           const userInfo = JSON.parse(userInfoText);
-          if (userInfo && userInfo.email === email) {
+          
+          // Check if JSON response indicates unauthorized (status: 401 in response body)
+          if (userInfo.status === 401 || userInfo.status === 403) {
+            console.log('[verifyHopRelayUserPassword] Password valid: false (API JSON status:', userInfo.status + ')');
+            return false;
+          }
+          
+          // Check if response has successful status and valid data
+          if (userInfo.status === 200 && userInfo.data && userInfo.data.email === email) {
             console.log('[verifyHopRelayUserPassword] Password valid: true (user info email matches)');
             return true;
           }
-          console.log('[verifyHopRelayUserPassword] User info parsed but email mismatch or no email field');
+          
+          // Also accept if direct email field matches
+          if (userInfo.email === email) {
+            console.log('[verifyHopRelayUserPassword] Password valid: true (user info email matches)');
+            return true;
+          }
+          
+          console.log('[verifyHopRelayUserPassword] User info parsed but email mismatch or invalid status');
         } catch (jsonErr) {
           console.log('[verifyHopRelayUserPassword] User info not JSON, checking for email in HTML');
           // If not JSON, check if HTML contains the user's email
