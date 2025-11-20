@@ -1063,7 +1063,7 @@ export default function Index() {
                   const formData = new FormData();
                   formData.append("_action", "generate-sso-link");
                   formData.append("redirect", "dashboard");
-                  const response = await fetch(window.location.pathname, {
+                  const response = await fetch("?index", {
                     method: "POST",
                     body: formData,
                   });
@@ -1083,7 +1083,7 @@ export default function Index() {
                   const formData = new FormData();
                   formData.append("_action", "generate-sso-link");
                   formData.append("redirect", "dashboard/hosts/android");
-                  const response = await fetch(window.location.pathname, {
+                  const response = await fetch("?index", {
                     method: "POST",
                     body: formData,
                   });
@@ -1104,7 +1104,7 @@ export default function Index() {
                   const formData = new FormData();
                   formData.append("_action", "generate-sso-link");
                   formData.append("redirect", "dashboard/hosts/whatsapp");
-                  const response = await fetch(window.location.pathname, {
+                  const response = await fetch("?index", {
                     method: "POST",
                     body: formData,
                   });
