@@ -405,13 +405,21 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   form.set("email", email);
   form.set("password", password);
 
+  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
+
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     body: form,
+    redirect: 'manual', // Don't follow redirects
   });
 
-  // If login successful, user credentials are valid
-  return response.ok;
+  console.log('[verifyHopRelayUserPassword] Response status:', response.status);
+  
+  // Login successful returns 302 redirect or 200
+  const isValid = response.status === 302 || response.status === 200 || response.ok;
+  console.log('[verifyHopRelayUserPassword] Password valid:', isValid);
+  
+  return isValid;
 }
 
 export async function createHopRelaySubscription({
