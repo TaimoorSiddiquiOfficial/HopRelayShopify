@@ -249,6 +249,25 @@ export async function createHopRelayUser({ name, email, password }) {
   return json.data;
 }
 
+export async function sendHopRelayPasswordReset({ email }) {
+  const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  
+  const form = new FormData();
+  form.set("email", email);
+
+  const response = await fetch(`${baseUrl}/auth/recovery`, {
+    method: "POST",
+    body: form,
+  });
+
+  // Password reset endpoint may not return JSON, just check status
+  if (!response.ok) {
+    throw new Error(`Failed to send password reset email: ${response.status}`);
+  }
+
+  return { success: true };
+}
+
 export async function createHopRelaySubscription({
   userId,
   packageId,

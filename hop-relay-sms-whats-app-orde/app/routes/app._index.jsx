@@ -19,6 +19,7 @@ import {
   createHopRelaySsoLink,
   sendHopRelaySmsBulk,
   sendHopRelayWhatsappBulk,
+  sendHopRelayPasswordReset,
 } from "../hoprelay.server";
 
 export const loader = async ({ request }) => {
@@ -694,6 +695,37 @@ export const action = async ({ request }) => {
       }
     }
 
+    case "reset-password": {
+      try {
+        const settings = await prisma.hopRelaySettings.findUnique({
+          where: { shop: session.shop },
+        });
+
+        if (!settings?.hoprelayUserEmail) {
+          return {
+            ok: false,
+            type: "reset-password",
+            error: "No HopRelay account linked.",
+          };
+        }
+
+        await sendHopRelayPasswordReset({ email: settings.hoprelayUserEmail });
+
+        return {
+          ok: true,
+          type: "reset-password",
+          email: settings.hoprelayUserEmail,
+        };
+      } catch (error) {
+        console.error("Failed to send password reset:", error);
+        return {
+          ok: false,
+          type: "reset-password",
+          error: error.message || "Unable to send password reset email.",
+        };
+      }
+    }
+
     default:
       return {
         ok: false,
@@ -725,6 +757,7 @@ export default function Index() {
   const notificationsFetcher = useFetcher();
   const campaignFetcher = useFetcher();
   const ssoFetcher = useFetcher();
+  const resetPasswordFetcher = useFetcher();
 
   const shopify = useAppBridge();
   const [activeTab, setActiveTab] = useState("account");
@@ -752,11 +785,14 @@ export default function Index() {
       sendersFetcher.data ||
       notificationsFetcher.data ||
       campaignFetcher.data ||
-      ssoFetcher.data;
+      ssoFetcher.data ||
+      resetPasswordFetcher.data;
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
         window.open(data.url, "_blank");
+      } else if (data?.type === "reset-password") {
+        shopify.toast.show(`Password reset email sent to ${data.email}`);
       } else {
         shopify.toast.show("Saved successfully");
       }
@@ -773,6 +809,7 @@ export default function Index() {
     notificationsFetcher.data,
     campaignFetcher.data,
     ssoFetcher.data,
+    resetPasswordFetcher.data,
     shopify,
   ]);
 
@@ -935,6 +972,9 @@ export default function Index() {
                     type="password"
                     placeholder="Create a password"
                   />
+                  <s-text variation="subdued" size="small">
+                    Save this password - you'll need it to login directly to HopRelay.com
+                  </s-text>
                   <s-button
                     type="submit"
                     loading={
@@ -948,6 +988,33 @@ export default function Index() {
                 </s-stack>
               </createAccountFetcher.Form>
             </>
+          )}
+          
+          {isAccountConnected && (
+            <s-section heading="Account Access">
+              <s-stack direction="block" gap="base">
+                <s-text>
+                  Account email: <strong>{hoprelaySettings.hoprelayUserEmail}</strong>
+                </s-text>
+                <s-text variation="subdued" size="small">
+                  Forgot your HopRelay.com password? Click below to receive a password reset email.
+                </s-text>
+                <resetPasswordFetcher.Form method="post">
+                  <input type="hidden" name="_action" value="reset-password" />
+                  <s-button
+                    type="submit"
+                    variant="secondary"
+                    loading={
+                      ["loading", "submitting"].includes(
+                        resetPasswordFetcher.state,
+                      )
+                    }
+                  >
+                    Reset Password
+                  </s-button>
+                </resetPasswordFetcher.Form>
+              </s-stack>
+            </s-section>
           )}
 
           <s-section heading="Choose plan">
