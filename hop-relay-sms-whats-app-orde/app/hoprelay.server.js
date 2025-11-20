@@ -641,30 +641,37 @@ export async function verifyHopRelayUserPassword({ email, password }) {
         try {
           const content = await resp.text();
           
-          if (looksLoggedOut(content)) {
+          // First check for positive logged-in indicators
+          const hasLoggedInMarkers = looksLoggedIn(content);
+          const hasLoggedOutMarkers = looksLoggedOut(content);
+          
+          console.log('[verifyHopRelayUserPassword] Page check - logged in markers:', hasLoggedInMarkers, 'logged out markers:', hasLoggedOutMarkers);
+          
+          // If we have logged-in indicators, it's valid even if there are login links
+          if (hasLoggedInMarkers) {
+            console.log(
+              "[verifyHopRelayUserPassword] Password valid: true (page has logged-in indicators)",
+            );
+            return true;
+          }
+          
+          // If no logged-in indicators but has logged-out markers, definitely invalid
+          if (hasLoggedOutMarkers) {
             console.log(
               "[verifyHopRelayUserPassword] Password valid: false (page content looks logged out)",
             );
             return false;
           }
           
-          if (!looksLoggedIn(content)) {
-            console.log(
-              "[verifyHopRelayUserPassword] Password valid: false (no logged-in indicators found)",
-            );
-            return false;
-          }
-
+          // If neither, keep checking (ambiguous)
           console.log(
-            "[verifyHopRelayUserPassword] Password valid: true (page has logged-in indicators)",
+            "[verifyHopRelayUserPassword] Page is ambiguous, continuing verification...",
           );
-          return true;
         } catch (e) {
           console.log(
-            "[verifyHopRelayUserPassword] Password valid: false (error reading page content)",
+            "[verifyHopRelayUserPassword] Error reading page content:",
             e,
           );
-          return false;
         }
       }
 
