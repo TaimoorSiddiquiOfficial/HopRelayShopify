@@ -414,13 +414,21 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   });
 
   console.log('[verifyHopRelayUserPassword] Response status:', response.status);
+  console.log('[verifyHopRelayUserPassword] Response headers:', Object.fromEntries(response.headers.entries()));
   
   // Check the redirect location to determine if login was successful
   const location = response.headers.get('location');
   console.log('[verifyHopRelayUserPassword] Redirect location:', location);
   
+  // Read response body to check for error messages
+  const text = await response.text();
+  console.log('[verifyHopRelayUserPassword] Response body (first 500 chars):', text.substring(0, 500));
+  
   // Successful login redirects to /dashboard, failed login redirects back to /auth/login with error
-  const isValid = response.status === 302 && location && location.includes('/dashboard');
+  // Also check if response body contains error messages
+  const hasErrorInBody = text && (text.includes('error') || text.includes('Error') || text.includes('invalid') || text.includes('Invalid'));
+  const isValid = response.status === 302 && location && (location.includes('/dashboard') || location.includes('dashboard')) && !hasErrorInBody;
+  console.log('[verifyHopRelayUserPassword] Has error in body:', hasErrorInBody);
   console.log('[verifyHopRelayUserPassword] Password valid:', isValid);
   
   return isValid;
