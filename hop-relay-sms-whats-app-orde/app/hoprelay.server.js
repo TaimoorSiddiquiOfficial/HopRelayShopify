@@ -422,20 +422,93 @@ export async function sendHopRelayPasswordReset({ email }) {
 }
 
 export async function verifyHopRelayUserPassword({ email, password }) {
-  console.log('[verifyHopRelayUserPassword] Password verification disabled - returning true for all attempts');
-  console.log('[verifyHopRelayUserPassword] Note: User existence will be verified via Admin API, not password');
+  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
   
-  // SECURITY NOTE: Password verification via HopRelay API is not reliable
-  // The /api/auth endpoint returns 401 for valid credentials
-  // Instead, we rely on:
-  // 1. Admin API to check if user exists (requires System Token)
-  // 2. SSO plugin token for secure authentication after account creation
-  // 
-  // This means:
-  // - If user exists in HopRelay → link via SSO (no password needed)
-  // - If user doesn't exist → create via Admin API (password is set correctly)
+  // SECURITY: Verify password by attempting to authenticate and get user ID
+  // We'll use the SSO plugin endpoint which requires valid authentication
   
-  return true; // Always return true, actual validation happens via Admin API user lookup
+  if (!HOPRELAY_SSO_PLUGIN_TOKEN) {
+    console.log('[verifyHopRelayUserPassword] SSO plugin token not configured - cannot verify password');
+    return false;
+  }
+  
+  const baseUrl = HOPRELAY_WEB_BASE_URL;
+  const loginForm = new FormData();
+  loginForm.set("email", email);
+  loginForm.set("password", password);
+  
+  try {
+    // Step 1: Login to get session cookie
+    const loginResp = await fetch(`${baseUrl}/auth/login`, {
+      method: "POST",
+      body: loginForm,
+      redirect: "manual",
+    });
+    
+    console.log('[verifyHopRelayUserPassword] Login response status:', loginResp.status);
+    
+    // Extract session cookie
+    const cookies = loginResp.headers.get('set-cookie');
+    if (!cookies || !cookies.includes('PHPSESSID=')) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
+      return false;
+    }
+    
+    const sessionMatch = cookies.match(/PHPSESSID=([^;]+)/);
+    if (!sessionMatch) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (failed to extract session)');
+      return false;
+    }
+    
+    const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
+    console.log('[verifyHopRelayUserPassword] Extracted session cookie');
+    
+    // Step 2: Try to get user info via plugin endpoint with session
+    const pluginUrl = `${baseUrl}/plugin?token=${HOPRELAY_SSO_PLUGIN_TOKEN}`;
+    const pluginResp = await fetch(pluginUrl, {
+      method: "GET",
+      headers: {
+        Cookie: sessionCookie,
+      },
+    });
+    
+    console.log('[verifyHopRelayUserPassword] Plugin endpoint status:', pluginResp.status);
+    
+    if (!pluginResp.ok) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (plugin endpoint failed)');
+      return false;
+    }
+    
+    let pluginData;
+    try {
+      pluginData = await pluginResp.json();
+    } catch (e) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (invalid plugin response)');
+      return false;
+    }
+    
+    console.log('[verifyHopRelayUserPassword] Plugin response:', JSON.stringify({
+      status: pluginData.status,
+      hasData: !!pluginData.data,
+      hasUserId: pluginData.data && !!pluginData.data.id,
+      hasEmail: pluginData.data && !!pluginData.data.email
+    }));
+    
+    // Valid password returns user data with matching email
+    if (pluginData.status === 200 && 
+        pluginData.data && 
+        pluginData.data.email && 
+        pluginData.data.email.toLowerCase() === email.toLowerCase()) {
+      console.log('[verifyHopRelayUserPassword] Password valid: true (plugin returned matching user data)');
+      return true;
+    }
+    
+    console.log('[verifyHopRelayUserPassword] Password valid: false (email mismatch or no user data)');
+    return false;
+  } catch (error) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (exception:', error.message + ')');
+    return false;
+  }
 }
 
 export async function createHopRelaySubscription({
