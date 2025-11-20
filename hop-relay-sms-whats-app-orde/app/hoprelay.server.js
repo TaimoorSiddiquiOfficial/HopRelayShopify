@@ -465,56 +465,43 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // CRITICAL: Verify session by checking homepage for logout button
-  // HopRelay redirects /account/settings to homepage for logged-in users
+  // CRITICAL: Verify session by accessing account page
+  // Valid sessions will access account page successfully, invalid ones redirect to login
   try {
-    const homeResp = await fetch(`${baseUrl}/`, {
+    const accountResp = await fetch(`${baseUrl}/account`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
       },
-      redirect: "follow",
+      redirect: "manual", // Don't follow redirects - check where it wants to go
     });
     
-    console.log('[verifyHopRelayUserPassword] Homepage final status:', homeResp.status);
-    console.log('[verifyHopRelayUserPassword] Homepage final URL:', homeResp.url);
+    console.log('[verifyHopRelayUserPassword] Account page status:', accountResp.status);
+    const accountLocation = accountResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Account page redirect location:', accountLocation);
     
-    // If redirected to login page, session is invalid
-    if (homeResp.url.includes('/auth/login')) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (redirected to login page)');
+    // If redirecting to login page, session is invalid
+    if (accountLocation && accountLocation.includes('/auth/login')) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (account page redirects to login)');
       return false;
     }
     
-    // Homepage must return 200 OK
-    if (homeResp.status !== 200) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (homepage status:', homeResp.status + ')');
-      return false;
+    // Valid session should either:
+    // 1. Return 200 OK (account page loads)
+    // 2. Redirect to homepage or dashboard (302 to /, /dashboard, etc) - NOT to login
+    if (accountResp.status === 200) {
+      console.log('[verifyHopRelayUserPassword] Password valid: true (account page accessible)');
+      return true;
     }
     
-    // Check homepage HTML for logged-in state indicators
-    const homeHtml = await homeResp.text();
-    
-    // Valid sessions should have logout link and NOT have login link in main content
-    const hasLogout = homeHtml.includes('/auth/logout') || homeHtml.includes('logout');
-    const hasLoginForm = homeHtml.includes('name="email"') && homeHtml.includes('name="password"');
-    
-    console.log('[verifyHopRelayUserPassword] Homepage has logout:', hasLogout);
-    console.log('[verifyHopRelayUserPassword] Homepage has login form:', hasLoginForm);
-    
-    // If homepage shows login form, session is invalid
-    if (hasLoginForm) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (homepage shows login form)');
-      return false;
+    // If redirecting but NOT to login, it's valid (redirects to dashboard/home)
+    if (accountResp.status === 302 && accountLocation && !accountLocation.includes('/auth/login')) {
+      console.log('[verifyHopRelayUserPassword] Password valid: true (account redirects to:', accountLocation + ')');
+      return true;
     }
     
-    // Valid session must have logout option
-    if (!hasLogout) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (no logout link found)');
-      return false;
-    }
-    
-    console.log('[verifyHopRelayUserPassword] Password valid: true (valid session detected)');
-    return true;
+    console.log('[verifyHopRelayUserPassword] Password valid: false (unexpected account page response)');
+    return false;
   } catch (e) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (settings check failed:', e.message + ')');
     return false;
