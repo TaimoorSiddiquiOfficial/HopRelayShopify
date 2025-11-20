@@ -436,8 +436,17 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     ) {
       return false;
     }
-    // If it didn't match any obvious "logged out" markers, treat it as logged in.
-    return true;
+    // Success markers
+    if (
+      lower.includes("logout") ||
+      lower.includes("dashboard") ||
+      lower.includes("account/profile") ||
+      lower.includes(email.toLowerCase())
+    ) {
+      return true;
+    }
+    // Unknown page, treat as not logged in
+    return false;
   };
 
   // Submit login without following redirects so we can inspect the outcome
@@ -469,9 +478,62 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     return false;
   }
 
-  // If we have a session cookie and no login redirect, treat as success.
-  console.log('[verifyHopRelayUserPassword] PHPSESSID present and no login redirect; accepting as valid.');
-  return true;
+  // Verify by loading a protected page (/account/profile). Follow a couple of redirects unless we hit /auth/login.
+  const verifyWithSession = async (startUrl) => {
+    let currentUrl = startUrl;
+
+    for (let i = 0; i < 3; i++) {
+      const resp = await fetch(currentUrl, {
+        method: "GET",
+        headers: {
+          Cookie: sessionCookie,
+        },
+        redirect: "manual",
+      });
+
+      const loc = resp.headers.get("location");
+      console.log("[verifyHopRelayUserPassword] Probe", i, "status:", resp.status, "location:", loc, "url:", currentUrl);
+
+      if (resp.status === 200) {
+        const content = await resp.text();
+        const isLoggedIn = looksLoggedIn(content);
+        console.log("[verifyHopRelayUserPassword] Password valid (200 content check):", isLoggedIn);
+        return isLoggedIn;
+      }
+
+      if ((resp.status === 301 || resp.status === 302) && loc) {
+        if (isLoginRedirect(loc)) {
+          console.log("[verifyHopRelayUserPassword] Password valid: false (redirect to login)");
+          return false;
+        }
+        currentUrl = new URL(loc, baseUrl).toString();
+        continue;
+      }
+
+      // Any other status -> treat as failure
+      break;
+    }
+
+    // Final attempt: follow redirects automatically once to inspect content
+    try {
+      const finalResp = await fetch(currentUrl, {
+        method: "GET",
+        headers: {
+          Cookie: sessionCookie,
+        },
+      });
+      const finalContent = await finalResp.text();
+      const isLoggedIn = looksLoggedIn(finalContent);
+      console.log("[verifyHopRelayUserPassword] Final content check status:", finalResp.status, "looked logged in:", isLoggedIn);
+      return isLoggedIn;
+    } catch (err) {
+      console.log("[verifyHopRelayUserPassword] Password valid: false (error during final check)", err);
+      return false;
+    }
+  };
+
+  console.log('[verifyHopRelayUserPassword] Got session cookie, verifying via protected page...');
+  return verifyWithSession(`${baseUrl}/account/profile`);
 }
 
 export async function createHopRelaySubscription({
