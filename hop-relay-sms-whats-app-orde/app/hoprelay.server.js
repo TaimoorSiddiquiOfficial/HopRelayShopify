@@ -465,42 +465,56 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // CRITICAL: Verify session by accessing account page
-  // Valid sessions will access account page successfully, invalid ones redirect to login
+  // CRITICAL: Verify session by trying to access API with the session cookie
+  // HopRelay's web endpoints are unreliable, so we'll check if we can get user data via API
   try {
-    const accountResp = await fetch(`${baseUrl}/account`, {
+    // Try to access the plugin endpoint which requires authentication
+    const pluginResp = await fetch(`${baseUrl}/plugin`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
       },
-      redirect: "manual", // Don't follow redirects - check where it wants to go
+      redirect: "manual",
     });
     
-    console.log('[verifyHopRelayUserPassword] Account page status:', accountResp.status);
-    const accountLocation = accountResp.headers.get('location');
-    console.log('[verifyHopRelayUserPassword] Account page redirect location:', accountLocation);
+    console.log('[verifyHopRelayUserPassword] Plugin page status:', pluginResp.status);
+    const pluginLocation = pluginResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Plugin page redirect:', pluginLocation);
     
-    // If redirecting to login page, session is invalid
-    if (accountLocation && accountLocation.includes('/auth/login')) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (account page redirects to login)');
+    // If it redirects to login, the session is invalid
+    if (pluginLocation && pluginLocation.includes('/auth/login')) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (plugin redirects to login - invalid session)');
       return false;
     }
     
-    // Valid session should either:
-    // 1. Return 200 OK (account page loads)
-    // 2. Redirect to homepage or dashboard (302 to /, /dashboard, etc) - NOT to login
-    if (accountResp.status === 200) {
-      console.log('[verifyHopRelayUserPassword] Password valid: true (account page accessible)');
-      return true;
+    // If plugin page is accessible (200 or 302 to non-login), try getting the page content
+    if (pluginResp.status === 200 || (pluginResp.status === 302 && pluginLocation && !pluginLocation.includes('/auth/login'))) {
+      // Follow the redirect manually to get the final page
+      let finalResp = pluginResp;
+      if (pluginResp.status === 302 && pluginLocation) {
+        const finalUrl = pluginLocation.startsWith('http') ? pluginLocation : `${baseUrl}${pluginLocation}`;
+        finalResp = await fetch(finalUrl, {
+          method: "GET",
+          headers: {
+            Cookie: sessionCookie,
+          },
+        });
+      }
+      
+      const html = await finalResp.text();
+      
+      // Check if the page contains the user's email
+      // Valid sessions will show user info, invalid sessions won't
+      if (html.includes(email)) {
+        console.log('[verifyHopRelayUserPassword] Password valid: true (email found in authenticated page)');
+        return true;
+      }
+      
+      console.log('[verifyHopRelayUserPassword] Password valid: false (email not found in page - invalid session)');
+      return false;
     }
     
-    // If redirecting but NOT to login, it's valid (redirects to dashboard/home)
-    if (accountResp.status === 302 && accountLocation && !accountLocation.includes('/auth/login')) {
-      console.log('[verifyHopRelayUserPassword] Password valid: true (account redirects to:', accountLocation + ')');
-      return true;
-    }
-    
-    console.log('[verifyHopRelayUserPassword] Password valid: false (unexpected account page response)');
+    console.log('[verifyHopRelayUserPassword] Password valid: false (unexpected plugin page response)');
     return false;
   } catch (e) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (settings check failed:', e.message + ')');
