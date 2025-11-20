@@ -177,7 +177,8 @@ export const action = async ({ request }) => {
             return {
               ok: false,
               type: "create-hoprelay-account",
-              error: "Account already exists with a different password. Please enter the correct password for your HopRelay.com account.",
+              error: "Account already exists. Please use the 'Reset Password' button below to reset your password, then try again.",
+              needsPasswordReset: true,
             };
           }
           
@@ -739,6 +740,35 @@ export const action = async ({ request }) => {
       }
     }
 
+    case "reset-password-guest": {
+      try {
+        const email = formData.get("email");
+        
+        if (!email) {
+          return {
+            ok: false,
+            type: "reset-password-guest",
+            error: "Email is required.",
+          };
+        }
+
+        await sendHopRelayPasswordReset({ email });
+
+        return {
+          ok: true,
+          type: "reset-password-guest",
+          email: email,
+        };
+      } catch (error) {
+        console.error("Failed to send password reset:", error);
+        return {
+          ok: false,
+          type: "reset-password-guest",
+          error: error.message || "Unable to send password reset email.",
+        };
+      }
+    }
+
     default:
       return {
         ok: false,
@@ -959,7 +989,7 @@ export default function Index() {
           </s-section>
           {!isAccountConnected && (
             <>
-              <s-heading level="3">Create HopRelay account</s-heading>
+              <s-heading level="3">Create or Connect HopRelay Account</s-heading>
               <createAccountFetcher.Form method="post">
                 <input
                   type="hidden"
@@ -967,6 +997,46 @@ export default function Index() {
                   value="create-hoprelay-account"
                 />
                 <s-stack direction="block" gap="base">
+                  {createAccountFetcher.data?.error && (
+                    <s-text variation="negative">{createAccountFetcher.data.error}</s-text>
+                  )}
+                  
+                  {createAccountFetcher.data?.needsPasswordReset && (
+                    <s-box padding="base" borderWidth="base" borderRadius="base" background="critical-subdued">
+                      <s-stack direction="block" gap="base">
+                        <s-text>
+                          <strong>Account exists but password is incorrect.</strong>
+                        </s-text>
+                        <s-text size="small">
+                          Reset your password using the button below, then try connecting again with your new password.
+                        </s-text>
+                        <resetPasswordFetcher.Form method="post">
+                          <input 
+                            type="hidden" 
+                            name="_action" 
+                            value="reset-password-guest" 
+                          />
+                          <input 
+                            type="hidden" 
+                            name="email" 
+                            value={createAccountFetcher.formData?.get("email") || ""} 
+                          />
+                          <s-button
+                            type="submit"
+                            variant="primary"
+                            loading={
+                              ["loading", "submitting"].includes(
+                                resetPasswordFetcher.state,
+                              )
+                            }
+                          >
+                            Send Password Reset Email
+                          </s-button>
+                        </resetPasswordFetcher.Form>
+                      </s-stack>
+                    </s-box>
+                  )}
+                  
                   <s-text-field
                     label="Full name"
                     name="name"
@@ -983,10 +1053,11 @@ export default function Index() {
                     label="Password for HopRelay"
                     name="password"
                     type="password"
-                    placeholder="Create a password"
+                    placeholder="Enter your HopRelay.com password or create a new one"
                   />
                   <s-text variation="subdued" size="small">
-                    Save this password - you'll need it to login directly to HopRelay.com
+                    • If this email already exists in HopRelay.com, enter your existing password<br/>
+                    • If this is a new account, create a password (save it for later use)
                   </s-text>
                   <s-button
                     type="submit"
@@ -996,7 +1067,7 @@ export default function Index() {
                       )
                     }
                   >
-                    Create account
+                    Connect Account
                   </s-button>
                 </s-stack>
               </createAccountFetcher.Form>
@@ -1006,47 +1077,23 @@ export default function Index() {
           {isAccountConnected && (
             <s-section heading="Account Access">
               <s-stack direction="block" gap="base">
-                <s-text>
-                  Account email: <strong>{hoprelaySettings.hoprelayUserEmail}</strong>
-                </s-text>
                 <s-text variation="subdued" size="small">
-                  Forgot your HopRelay.com password? Click below to receive a password reset email.
+                  Need to reset your HopRelay.com password?
                 </s-text>
-                <s-stack direction="inline" gap="base">
-                  <resetPasswordFetcher.Form method="post">
-                    <input type="hidden" name="_action" value="reset-password" />
-                    <s-button
-                      type="submit"
-                      variant="secondary"
-                      loading={
-                        ["loading", "submitting"].includes(
-                          resetPasswordFetcher.state,
-                        )
-                      }
-                    >
-                      Reset Password
-                    </s-button>
-                  </resetPasswordFetcher.Form>
-                  <disconnectAccountFetcher.Form method="post">
-                    <input type="hidden" name="_action" value="disconnect-hoprelay-account" />
-                    <s-button
-                      type="submit"
-                      variant="secondary"
-                      tone="critical"
-                      loading={
-                        ["loading", "submitting"].includes(
-                          disconnectAccountFetcher.state,
-                        )
-                      }
-                    >
-                      Disconnect Account
-                    </s-button>
-                  </disconnectAccountFetcher.Form>
-                </s-stack>
-                <s-text variation="subdued" size="small">
-                  <strong>Note:</strong> If you created this account with a different password than your HopRelay.com account, 
-                  disconnect and reconnect using your correct HopRelay.com password.
-                </s-text>
+                <resetPasswordFetcher.Form method="post">
+                  <input type="hidden" name="_action" value="reset-password" />
+                  <s-button
+                    type="submit"
+                    variant="secondary"
+                    loading={
+                      ["loading", "submitting"].includes(
+                        resetPasswordFetcher.state,
+                      )
+                    }
+                  >
+                    Send Password Reset Email
+                  </s-button>
+                </resetPasswordFetcher.Form>
               </s-stack>
             </s-section>
           )}
