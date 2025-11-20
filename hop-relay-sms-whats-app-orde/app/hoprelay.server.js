@@ -228,6 +228,17 @@ export async function findHopRelayUserByEmail(email) {
 export async function createHopRelayUser({ name, email, password }) {
   ensureSystemToken();
 
+  // Test if the API token is valid first
+  console.log('[createHopRelayUser] Testing API token...');
+  const testForm = new FormData();
+  testForm.set("token", HOPRELAY_SYSTEM_TOKEN);
+  const testResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users?page=1&limit=1`, {
+    method: "POST",
+    body: testForm,
+  });
+  const testJson = await testResponse.json();
+  console.log('[createHopRelayUser] Token test response:', testJson);
+
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("name", name);
@@ -248,6 +259,8 @@ export async function createHopRelayUser({ name, email, password }) {
     country: DEFAULT_COUNTRY,
     language: DEFAULT_LANGUAGE_ID,
     role: DEFAULT_ROLE_ID,
+    hasToken: !!HOPRELAY_SYSTEM_TOKEN,
+    tokenLength: HOPRELAY_SYSTEM_TOKEN.length,
     url: `${HOPRELAY_ADMIN_BASE_URL}/create/user`
   });
 
