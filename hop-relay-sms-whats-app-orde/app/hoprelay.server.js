@@ -450,18 +450,79 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   }
 
   // Require a PHPSESSID cookie to attempt session verification
-  const sessionCookie = cookies ? cookies.split(';')[0] : null;
-  if (!sessionCookie || !sessionCookie.startsWith('PHPSESSID=')) {
+  let sessionCookie = null;
+  if (cookies) {
+    // Find the PHPSESSID cookie within the Set-Cookie header
+    const match = cookies.match(/PHPSESSID=[^;]+/);
+    if (match) {
+      sessionCookie = match[0];
+    }
+  }
+
+  if (!sessionCookie) {
     console.log('[verifyHopRelayUserPassword] Password valid: false (no PHPSESSID cookie)');
     return false;
   }
 
-  // At this point we have:
-  // - A redirect that did NOT go back to /auth/login
-  // - A PHPSESSID cookie set
-  // That strongly indicates a successful login, so treat the password as valid.
-  console.log('[verifyHopRelayUserPassword] Password valid: true (session cookie set, no redirect to login)');
-  return true;
+  // Double-check by loading a protected page (/account/profile). If that page
+  // redirects back to /auth/login, treat the password as invalid.
+  const verifyWithSession = async (startUrl) => {
+    let currentUrl = startUrl;
+
+    for (let i = 0; i < 3; i++) {
+      const resp = await fetch(currentUrl, {
+        method: "GET",
+        headers: {
+          Cookie: sessionCookie,
+        },
+        redirect: "manual",
+      });
+
+      const loc = resp.headers.get("location");
+      console.log(
+        "[verifyHopRelayUserPassword] Probe",
+        i,
+        "status:",
+        resp.status,
+        "location:",
+        loc,
+        "url:",
+        currentUrl,
+      );
+
+      if (resp.status === 200) {
+        console.log(
+          "[verifyHopRelayUserPassword] Password valid: true (protected page 200)",
+        );
+        return true;
+      }
+
+      if ((resp.status === 301 || resp.status === 302) && loc) {
+        if (isLoginRedirect(loc)) {
+          console.log(
+            "[verifyHopRelayUserPassword] Password valid: false (protected page redirect to login)",
+          );
+          return false;
+        }
+
+        currentUrl = new URL(loc, baseUrl).toString();
+        continue;
+      }
+
+      // Any other status -> break and treat as failure
+      break;
+    }
+
+    console.log(
+      "[verifyHopRelayUserPassword] Password valid: false (protected page check failed)",
+    );
+    return false;
+  };
+
+  console.log(
+    "[verifyHopRelayUserPassword] Got session cookie, verifying via protected page...",
+  );
+  return verifyWithSession(`${baseUrl}/account/profile`);
 }
 
 export async function createHopRelaySubscription({
