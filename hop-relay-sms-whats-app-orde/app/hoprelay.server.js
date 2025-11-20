@@ -228,16 +228,15 @@ export async function findHopRelayUserByEmail(email) {
 export async function createHopRelayUser({ name, email, password }) {
   ensureSystemToken();
 
-  // Test if the API token is valid first
-  console.log('[createHopRelayUser] Testing API token...');
-  const testForm = new FormData();
-  testForm.set("token", HOPRELAY_SYSTEM_TOKEN);
-  const testResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users?page=1&limit=1`, {
-    method: "POST",
-    body: testForm,
-  });
-  const testJson = await testResponse.json();
-  console.log('[createHopRelayUser] Token test response:', testJson);
+  // Check if email already exists
+  console.log('[createHopRelayUser] Checking if email exists:', email);
+  const existingUser = await findHopRelayUserByEmail(email);
+  console.log('[createHopRelayUser] Existing user check:', existingUser);
+  
+  if (existingUser && existingUser.id) {
+    console.log('[createHopRelayUser] Email already exists in HopRelay:', email);
+    throw new Error(`Email address ${email} is already registered in HopRelay. Please use the password verification flow instead of creating a new account.`);
+  }
 
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
