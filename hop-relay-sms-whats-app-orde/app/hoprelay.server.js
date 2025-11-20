@@ -443,6 +443,23 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       lower.includes("login </")
     );
   };
+  
+  const looksLoggedIn = (content) => {
+    const lower = content.toLowerCase();
+    
+    // Look for indicators that user is actually logged in
+    return (
+      lower.includes("logout") ||
+      lower.includes("log out") ||
+      lower.includes("sign out") ||
+      lower.includes("signout") ||
+      lower.includes("/auth/logout") ||
+      lower.includes("dashboard") ||
+      lower.includes("my account") ||
+      lower.includes("profile") ||
+      lower.includes("settings")
+    );
+  };
 
   // Submit login without following redirects so we can inspect the outcome
   const response = await fetch(`${baseUrl}/auth/login`, {
@@ -575,37 +592,31 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       );
 
       if (resp.status === 200) {
-        // Only check for logged-out content on protected pages, not homepage
-        const isHomepage = currentUrl === baseUrl || 
-                          currentUrl === baseUrl + '/' ||
-                          currentUrl === 'https://hoprelay.com' ||
-                          currentUrl === 'https://hoprelay.com/';
-        
-        if (isHomepage) {
-          // Reaching homepage with session cookie means successful login
-          console.log(
-            "[verifyHopRelayUserPassword] Password valid: true (homepage with valid session)",
-          );
-          return true;
-        }
-        
-        // For protected pages, check content
+        // Check content - must have logged-in indicators and no logged-out markers
         try {
           const content = await resp.text();
+          
           if (looksLoggedOut(content)) {
             console.log(
-              "[verifyHopRelayUserPassword] Password valid: false (protected page content looks logged out)",
+              "[verifyHopRelayUserPassword] Password valid: false (page content looks logged out)",
+            );
+            return false;
+          }
+          
+          if (!looksLoggedIn(content)) {
+            console.log(
+              "[verifyHopRelayUserPassword] Password valid: false (no logged-in indicators found)",
             );
             return false;
           }
 
           console.log(
-            "[verifyHopRelayUserPassword] Password valid: true (protected page 200 without login markers)",
+            "[verifyHopRelayUserPassword] Password valid: true (page has logged-in indicators)",
           );
           return true;
         } catch (e) {
           console.log(
-            "[verifyHopRelayUserPassword] Password valid: false (error reading protected page content)",
+            "[verifyHopRelayUserPassword] Password valid: false (error reading page content)",
             e,
           );
           return false;
