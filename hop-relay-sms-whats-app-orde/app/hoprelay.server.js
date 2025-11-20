@@ -265,6 +265,51 @@ export async function createHopRelayUser({ name, email, password }) {
     throw new Error(`Email address ${email} is already registered in HopRelay. Please use the password verification flow instead of creating a new account.`);
   }
 
+  // Try using the public registration endpoint first (doesn't require Admin API)
+  console.log('[createHopRelayUser] Attempting user creation via public registration endpoint...');
+  try {
+    const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+    const registerForm = new FormData();
+    registerForm.set("name", name);
+    registerForm.set("email", email);
+    registerForm.set("password", password);
+    registerForm.set("terms", "1"); // Accept terms
+    
+    const registerResponse = await fetch(`${baseUrl}/auth/register`, {
+      method: "POST",
+      body: registerForm,
+      redirect: 'manual', // Don't follow redirects
+    });
+    
+    console.log('[createHopRelayUser] Public registration response status:', registerResponse.status);
+    
+    // Registration typically returns 302 redirect on success
+    if (registerResponse.status === 302 || registerResponse.status === 200) {
+      console.log('[createHopRelayUser] Public registration successful, now finding user...');
+      
+      // Wait a moment for the user to be created
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Find the newly created user
+      const newUser = await findHopRelayUserByEmail(email);
+      if (newUser && newUser.id) {
+        console.log('[createHopRelayUser] Found newly created user:', newUser);
+        return {
+          id: newUser.id,
+          email: newUser.email || email,
+        };
+      }
+    }
+    
+    // If public registration didn't work, try the text response
+    const regText = await registerResponse.text();
+    console.log('[createHopRelayUser] Public registration response:', regText.substring(0, 200));
+  } catch (publicRegError) {
+    console.log('[createHopRelayUser] Public registration failed:', publicRegError.message);
+  }
+
+  // Fall back to Admin API method
+  console.log('[createHopRelayUser] Falling back to Admin API method...');
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("name", name);
