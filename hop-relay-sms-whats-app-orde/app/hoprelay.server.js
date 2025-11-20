@@ -202,27 +202,51 @@ export async function getHopRelayWaAccounts({ secret }) {
 export async function findHopRelayUserByEmail(email) {
   ensureSystemToken();
 
-  const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
-  url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
-  url.searchParams.set("limit", "250");
-  url.searchParams.set("page", "1");
-
-  const response = await fetch(url, {
-    method: "GET",
-  });
-
-  const json = await parseJsonResponse(response);
-  const users = json.data || [];
   const target = String(email || "").toLowerCase();
+  console.log('[findHopRelayUserByEmail] Searching for:', target);
 
-  return (
-    users.find(
+  // Search through multiple pages to find the user
+  for (let page = 1; page <= 10; page++) {
+    const form = new FormData();
+    form.set("token", HOPRELAY_SYSTEM_TOKEN);
+    form.set("limit", "250");
+    form.set("page", String(page));
+
+    const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users`, {
+      method: "POST",
+      body: form,
+    });
+
+    const json = await parseJsonResponse(response);
+    const users = json.data || [];
+    
+    console.log(`[findHopRelayUserByEmail] Page ${page}: Found ${users.length} users`);
+
+    if (users.length === 0) {
+      // No more users, stop searching
+      break;
+    }
+
+    const found = users.find(
       (user) =>
         user.email &&
         typeof user.email === "string" &&
         user.email.toLowerCase() === target,
-    ) || null
-  );
+    );
+
+    if (found) {
+      console.log('[findHopRelayUserByEmail] User found:', found);
+      return found;
+    }
+
+    // If we got less than 250 users, we've reached the end
+    if (users.length < 250) {
+      break;
+    }
+  }
+
+  console.log('[findHopRelayUserByEmail] User not found after searching all pages');
+  return null;
 }
 
 export async function createHopRelayUser({ name, email, password }) {
