@@ -452,8 +452,16 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       return false;
     }
 
-    // Only treat as logged in if we see explicit logout/profile markers AND the email we logged in with.
-    return hasLogout && (emailLower && lower.includes(emailLower));
+    if (!hasLogout) {
+      return false;
+    }
+
+    // Home page might not show email, so only require email match on profile URLs
+    if (lower.includes("/account/profile") || lower.includes("account/profile")) {
+      return emailLower ? lower.includes(emailLower) : false;
+    }
+
+    return true;
   };
 
   // Submit login without following redirects so we can inspect the outcome
