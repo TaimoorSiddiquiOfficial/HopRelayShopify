@@ -311,9 +311,34 @@ export async function createHopRelayUser({ name, email, password }) {
       console.log('[createHopRelayUser] Login test result:', loginTest);
       
       if (loginTest) {
-        throw new Error('This email already exists in HopRelay. The password you entered is correct - the account was linked successfully in a previous attempt. Please refresh the page.');
+        // Password is correct! Find the user and return their ID
+        console.log('[createHopRelayUser] Password verified! Finding user to get their ID...');
+        
+        // Try to find user by attempting login and parsing the response
+        const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+        const loginForm = new FormData();
+        loginForm.set("email", email);
+        loginForm.set("password", password);
+        
+        const loginResponse = await fetch(`${baseUrl}/auth/login`, {
+          method: "POST",
+          body: loginForm,
+        });
+        
+        const loginJson = await loginResponse.json();
+        console.log('[createHopRelayUser] Login response:', loginJson);
+        
+        if (loginJson && loginJson.id) {
+          // Return the user data as if we created them
+          return {
+            id: loginJson.id,
+            email: loginJson.email || email,
+          };
+        }
+        
+        throw new Error('Email already exists in HopRelay. Password is correct but unable to retrieve user ID. Please contact support.');
       } else {
-        throw new Error('This email might already exist in HopRelay, but the password is incorrect. Please use the "Reset Password" option to recover your account.');
+        throw new Error('This email already exists in HopRelay, but the password is incorrect. Please use the "Send Password Reset Email" button below to recover your account.');
       }
     }
   } catch (e) {
