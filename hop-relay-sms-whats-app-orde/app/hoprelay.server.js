@@ -4,7 +4,6 @@ const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
 
 const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
-const HOPRELAY_ADMIN_API_TOKEN = process.env.HOPRELAY_ADMIN_API_TOKEN || "";
 const HOPRELAY_SSO_PLUGIN_TOKEN =
   process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
 
@@ -418,75 +417,12 @@ export async function sendHopRelayPasswordReset({ email }) {
 }
 
 export async function verifyHopRelayUserPassword({ email, password }) {
-  // Use Admin API to verify password by attempting to get user info with credentials
-  try {
-    const form = new FormData();
-    form.set("email", email);
-    form.set("password", password);
-    
-    console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
-    
-    // Try to login and get session, then verify session is valid
-    const loginResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/auth/login`, {
-      method: "POST",
-      body: form,
-      redirect: "manual",
-    });
-    
-    console.log('[verifyHopRelayUserPassword] Login response status:', loginResponse.status);
-    
-    // Get session cookie from login response
-    const setCookieHeader = loginResponse.headers.get('set-cookie');
-    console.log('[verifyHopRelayUserPassword] Set-Cookie header:', setCookieHeader);
-    
-    if (setCookieHeader) {
-      // Extract PHPSESSID from set-cookie header
-      const sessionMatch = setCookieHeader.match(/PHPSESSID=([^;]+)/);
-      if (sessionMatch) {
-        const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
-        console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
-        
-        // Now verify the session by calling an authenticated endpoint with Admin API token
-        const verifyResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/system/user`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${HOPRELAY_ADMIN_API_TOKEN}`,
-            "Cookie": sessionCookie,
-          },
-        });
-        
-        console.log('[verifyHopRelayUserPassword] Verify response status:', verifyResponse.status);
-        
-        if (verifyResponse.status === 200) {
-          try {
-            const result = await verifyResponse.json();
-            console.log('[verifyHopRelayUserPassword] Verify result:', result);
-            
-            // Check if we got valid user data with matching email
-            if (result.status === 200 && result.data && result.data.email === email) {
-              console.log('[verifyHopRelayUserPassword] Password valid: true (session verified with matching email)');
-              return true;
-            }
-          } catch (e) {
-            console.log('[verifyHopRelayUserPassword] Failed to parse verify response:', e);
-          }
-        }
-      }
-    }
-    
-    console.log('[verifyHopRelayUserPassword] Password valid: false (verification failed)');
-    return false;
-  } catch (e) {
-    console.log('[verifyHopRelayUserPassword] Admin API verification failed, falling back to web verification:', e);
-  }
-  
-  // Fallback to original web-based verification
   const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
   const form = new FormData();
   form.set("email", email);
   form.set("password", password);
 
-  console.log('[verifyHopRelayUserPassword] Verifying password via web for:', email);
+  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
 
   const isLoginRedirect = (loc) =>
     !!loc && typeof loc === "string" && loc.includes("/auth/login");
