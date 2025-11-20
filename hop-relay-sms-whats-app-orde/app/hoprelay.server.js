@@ -563,9 +563,56 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
   // Don't trust the redirect alone - even wrong passwords get redirected to homepage
-  // We MUST verify the session actually works by checking a protected page
+  // We MUST verify the session actually works by checking a protected API endpoint
+  
+  // Try to access the user's account data via API - this should only work with valid session
+  try {
+    const apiCheckResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/account`, {
+      method: "GET",
+      headers: {
+        Cookie: sessionCookie,
+      },
+      redirect: "manual",
+    });
+    
+    console.log('[verifyHopRelayUserPassword] API check status:', apiCheckResp.status);
+    console.log('[verifyHopRelayUserPassword] API check redirect:', apiCheckResp.headers.get('location'));
+    
+    // If API redirects to login, session is invalid
+    if (isLoginRedirect(apiCheckResp.headers.get('location'))) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (API redirected to login)');
+      return false;
+    }
+    
+    // If we get 401/403, session is invalid
+    if (apiCheckResp.status === 401 || apiCheckResp.status === 403) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (API returned', apiCheckResp.status + ')');
+      return false;
+    }
+    
+    // If we get 200, check if response contains user data
+    if (apiCheckResp.status === 200) {
+      try {
+        const apiText = await apiCheckResp.text();
+        
+        // Check if it's actually account data or a login page
+        if (looksLoggedOut(apiText)) {
+          console.log('[verifyHopRelayUserPassword] Password valid: false (API response looks like login page)');
+          return false;
+        }
+        
+        // Valid response without login markers = success
+        console.log('[verifyHopRelayUserPassword] Password valid: true (API returned valid account data)');
+        return true;
+      } catch (e) {
+        console.log('[verifyHopRelayUserPassword] Error reading API response:', e);
+      }
+    }
+  } catch (e) {
+    console.log('[verifyHopRelayUserPassword] API check failed:', e);
+  }
 
-  // Double-check by loading a protected page (/account/profile). If that page
+  // Fallback: Double-check by loading a protected page (/account/profile). If that page
   // redirects back to /auth/login, treat the password as invalid.
   const verifyWithSession = async (startUrl) => {
     let currentUrl = startUrl;
