@@ -268,6 +268,22 @@ export async function sendHopRelayPasswordReset({ email }) {
   return { success: true };
 }
 
+export async function verifyHopRelayUserPassword({ email, password }) {
+  const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  
+  const form = new FormData();
+  form.set("email", email);
+  form.set("password", password);
+
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: "POST",
+    body: form,
+  });
+
+  // If login successful, user credentials are valid
+  return response.ok;
+}
+
 export async function createHopRelaySubscription({
   userId,
   packageId,
