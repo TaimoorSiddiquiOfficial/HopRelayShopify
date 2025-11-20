@@ -352,71 +352,8 @@ export async function createHopRelayUser({ name, email, password }) {
     
     // If error is "Invalid Parameters", it might be because email exists. Try direct login to verify.
     if (json.status === 400 && json.message === 'Invalid Parameters!') {
-      console.log('[createHopRelayUser] Got Invalid Parameters - testing if it\'s due to existing email...');
-      const loginTest = await verifyHopRelayUserPassword({ email, password });
-      console.log('[createHopRelayUser] Login test result:', loginTest);
-      
-      if (loginTest) {
-        // Password is correct! Search for the user in the system
-        console.log('[createHopRelayUser] Password verified! Searching all users to find this email...');
-        
-        // Search through ALL users to find this email
-        let foundUser = null;
-        for (let page = 1; page <= 50; page++) {
-          const form = new FormData();
-          form.set("token", HOPRELAY_SYSTEM_TOKEN);
-          form.set("limit", "250");
-          form.set("page", String(page));
-
-          const userResponse = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/get/users`, {
-            method: "POST",
-            body: form,
-          });
-
-          const userJson = await parseJsonResponse(userResponse);
-          const users = userJson.data || [];
-          
-          console.log(`[createHopRelayUser] Searching page ${page}: ${users.length} users`);
-
-          if (users.length === 0) break;
-
-          foundUser = users.find(u => 
-            u.email && 
-            typeof u.email === 'string' && 
-            u.email.toLowerCase() === email.toLowerCase()
-          );
-
-          if (foundUser) {
-            console.log('[createHopRelayUser] Found user:', foundUser);
-            break;
-          }
-
-          if (users.length < 250) break;
-        }
-        
-        if (foundUser && foundUser.id) {
-          // Return the user data
-          return {
-            id: foundUser.id,
-            email: foundUser.email || email,
-          };
-        }
-        
-        // User not found via Admin API, but password is correct
-        // This is likely a permissions issue with the Admin API only returning limited users
-        // As a workaround, we'll use a special marker ID and store the email
-        console.log('[createHopRelayUser] User not found in Admin API results, but password verified.');
-        console.log('[createHopRelayUser] This is likely an Admin API permission issue.');
-        console.log('[createHopRelayUser] Creating placeholder entry with email verification...');
-        
-        return {
-          id: 999999, // Special ID indicating email-verified but not found in API
-          email: email,
-          verified: true,
-        };
-      } else {
-        throw new Error('This email already exists in HopRelay, but the password is incorrect. Please use the "Send Password Reset Email" button below to recover your account.');
-      }
+      console.log('[createHopRelayUser] Got Invalid Parameters - email likely already exists');
+      throw new Error('This email is already registered in HopRelay. Please use the correct password for this account.');
     }
   } catch (e) {
     if (e.message.includes('email already exists') || e.message.includes('password is incorrect') || e.message.includes('Password is correct')) {
