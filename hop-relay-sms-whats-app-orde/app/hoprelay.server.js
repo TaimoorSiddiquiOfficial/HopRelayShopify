@@ -221,7 +221,19 @@ export async function getHopRelayWaAccounts({ secret }) {
 }
 
 export async function findHopRelayUserByEmail(email) {
-  ensureSystemToken();
+  // If system token is not valid, we'll skip the admin API lookup
+  // and rely on password verification instead
+  if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
+    console.log('[findHopRelayUserByEmail] System token not configured, skipping admin API lookup');
+    return null;
+  }
+
+  try {
+    ensureSystemToken();
+  } catch (error) {
+    console.log('[findHopRelayUserByEmail] System token validation failed, skipping admin API lookup:', error.message);
+    return null;
+  }
 
   const target = String(email || "").toLowerCase();
   console.log('[findHopRelayUserByEmail] Searching for:', target);
@@ -276,111 +288,143 @@ export async function findHopRelayUserByEmail(email) {
 }
 
 export async function createHopRelayUser({ name, email, password }) {
-  ensureSystemToken();
+  console.log('[createHopRelayUser] Starting user creation process...');
 
-  // First, check if the user exists and verify the password
-  console.log('[createHopRelayUser] Checking if user exists and verifying password...');
-  const existingUser = await findHopRelayUserByEmail(email);
+  // First, try to verify the password using the direct authentication method
+  // This will work even if the system token is invalid
+  console.log('[createHopRelayUser] Verifying password via direct authentication...');
+  const isPasswordValid = await verifyHopRelayUserPassword({ email, password });
   
-  if (existingUser && existingUser.id) {
-    console.log('[createHopRelayUser] User exists, verifying password...');
+  if (isPasswordValid) {
+    console.log('[createHopRelayUser] Password verified successfully - user exists');
     
-    // Try to verify the password
-    const isPasswordValid = await verifyHopRelayUserPassword({ email, password });
-    
-    if (isPasswordValid) {
-      console.log('[createHopRelayUser] Password verified successfully');
-      return {
-        id: existingUser.id,
-        email: existingUser.email || email,
-      };
-    } else {
-      console.log('[createHopRelayUser] Password verification failed');
-      throw new Error(`Account exists but password is incorrect. Please use the correct password for your existing HopRelay account, or reset your password if you've forgotten it.`);
-    }
-  }
-
-  // If user doesn't exist, create a new account
-  console.log('[createHopRelayUser] Creating new user account...');
-  try {
-    // Try using the public registration endpoint first
-    const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
-    const registerForm = new FormData();
-    registerForm.set("name", name);
-    registerForm.set("email", email);
-    registerForm.set("password", password);
-    registerForm.set("terms", "1"); // Accept terms
-    
-    const registerResponse = await fetch(`${baseUrl}/auth/register`, {
-      method: "POST",
-      body: registerForm,
-      redirect: 'manual',
-    });
-    
-    console.log('[createHopRelayUser] Public registration response status:', registerResponse.status);
-    
-    if (registerResponse.status === 302 || registerResponse.status === 200) {
-      console.log('[createHopRelayUser] Public registration successful, finding new user...');
-      
-      // Wait a moment for user creation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newUser = await findHopRelayUserByEmail(email);
-      if (newUser && newUser.id) {
-        console.log('[createHopRelayUser] Found newly created user:', newUser);
+    // Try to get user ID via admin API if available
+    try {
+      const existingUser = await findHopRelayUserByEmail(email);
+      if (existingUser && existingUser.id) {
+        console.log('[createHopRelayUser] Found user via admin API:', existingUser.id);
         return {
-          id: newUser.id,
-          email: newUser.email || email,
+          id: existingUser.id,
+          email: existingUser.email || email,
         };
       }
+    } catch (adminError) {
+      console.log('[createHopRelayUser] Admin API lookup failed, but password is valid:', adminError.message);
     }
-  } catch (publicRegError) {
-    console.log('[createHopRelayUser] Public registration failed:', publicRegError.message);
-  }
-
-  // Fall back to Admin API method
-  console.log('[createHopRelayUser] Using Admin API fallback...');
-  const form = new FormData();
-  form.set("token", HOPRELAY_SYSTEM_TOKEN);
-  form.set("name", name);
-  form.set("email", email);
-  form.set("password", password);
-  form.set("timezone", DEFAULT_TIMEZONE);
-  form.set("country", DEFAULT_COUNTRY);
-  form.set("language", DEFAULT_LANGUAGE_ID);
-
-  const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
-    method: "POST",
-    body: form,
-  });
-
-  let json;
-  try {
-    const text = await response.text();
-    json = JSON.parse(text);
     
-    if (json.status === 400 && json.message === 'Invalid Parameters!') {
-      throw new Error('This email is already registered in HopRelay. Please use the correct password for this account.');
+    // If we can't get the user ID via admin API, we'll use a placeholder approach
+    // The user can still use the system with password-based authentication
+    console.log('[createHopRelayUser] Using placeholder ID for verified user');
+    return {
+      id: 999999, // Placeholder ID that indicates password-verified user
+      email: email,
+      isPlaceholder: true,
+    };
+  } else {
+    console.log('[createHopRelayUser] Password verification failed - checking if user exists...');
+    
+    // Check if user exists via admin API
+    try {
+      const existingUser = await findHopRelayUserByEmail(email);
+      if (existingUser && existingUser.id) {
+        console.log('[createHopRelayUser] User exists but password is incorrect');
+        throw new Error(`Account exists but password is incorrect. Please use the correct password for your existing HopRelay account, or reset your password if you've forgotten it.`);
+      }
+    } catch (adminError) {
+      console.log('[createHopRelayUser] Admin API lookup failed:', adminError.message);
     }
-  } catch (e) {
-    if (e.message.includes('email already exists') || e.message.includes('password is incorrect')) {
-      throw e;
+    
+    // User doesn't exist or we can't verify - try to create new account
+    console.log('[createHopRelayUser] Attempting to create new user account...');
+    try {
+      // Try using the public registration endpoint first
+      const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+      const registerForm = new FormData();
+      registerForm.set("name", name);
+      registerForm.set("email", email);
+      registerForm.set("password", password);
+      registerForm.set("terms", "1"); // Accept terms
+      
+      const registerResponse = await fetch(`${baseUrl}/auth/register`, {
+        method: "POST",
+        body: registerForm,
+        redirect: 'manual',
+      });
+      
+      console.log('[createHopRelayUser] Public registration response status:', registerResponse.status);
+      
+      if (registerResponse.status === 302 || registerResponse.status === 200) {
+        console.log('[createHopRelayUser] Public registration successful, finding new user...');
+        
+        // Wait a moment for user creation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const newUser = await findHopRelayUserByEmail(email);
+        if (newUser && newUser.id) {
+          console.log('[createHopRelayUser] Found newly created user:', newUser);
+          return {
+            id: newUser.id,
+            email: newUser.email || email,
+          };
+        }
+      }
+    } catch (publicRegError) {
+      console.log('[createHopRelayUser] Public registration failed:', publicRegError.message);
     }
-    throw new Error('Failed to parse HopRelay response');
+
+    // Fall back to Admin API method if system token is available
+    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+      try {
+        console.log('[createHopRelayUser] Using Admin API fallback...');
+        const form = new FormData();
+        form.set("token", HOPRELAY_SYSTEM_TOKEN);
+        form.set("name", name);
+        form.set("email", email);
+        form.set("password", password);
+        form.set("timezone", DEFAULT_TIMEZONE);
+        form.set("country", DEFAULT_COUNTRY);
+        form.set("language", DEFAULT_LANGUAGE_ID);
+
+        const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
+          method: "POST",
+          body: form,
+        });
+
+        let json;
+        try {
+          const text = await response.text();
+          json = JSON.parse(text);
+          
+          if (json.status === 400 && json.message === 'Invalid Parameters!') {
+            throw new Error('This email is already registered in HopRelay. Please use the correct password for this account.');
+          }
+        } catch (e) {
+          if (e.message.includes('email already exists') || e.message.includes('password is incorrect')) {
+            throw e;
+          }
+          throw new Error('Failed to parse HopRelay response');
+        }
+        
+        if (!response.ok || (json && json.status && json.status !== 200)) {
+          const message = (json && json.message) || `HopRelay request failed with status ${response.status}`;
+          const error = new Error(message);
+          error.details = json;
+          throw error;
+        }
+        
+        if (!json.data || !json.data.id) {
+          throw new Error(json.message || 'Failed to create user - invalid response from HopRelay');
+        }
+        
+        return json.data;
+      } catch (adminApiError) {
+        console.log('[createHopRelayUser] Admin API creation failed:', adminApiError.message);
+      }
+    }
+    
+    // If all else fails, throw an error
+    throw new Error('Unable to create or verify HopRelay account. Please check your credentials and try again.');
   }
-  
-  if (!response.ok || (json && json.status && json.status !== 200)) {
-    const message = (json && json.message) || `HopRelay request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.details = json;
-    throw error;
-  }
-  
-  if (!json.data || !json.data.id) {
-    throw new Error(json.message || 'Failed to create user - invalid response from HopRelay');
-  }
-  
-  return json.data;
 }
 
 export async function sendHopRelayPasswordReset({ email }) {
@@ -466,7 +510,21 @@ export async function createHopRelaySubscription({
   packageId,
   durationMonths,
 }) {
-  ensureSystemToken();
+  // Check if system token is available
+  if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
+    throw new Error('Admin API is not configured. Please manage subscriptions manually in your HopRelay.com dashboard.');
+  }
+
+  try {
+    ensureSystemToken();
+  } catch (error) {
+    throw new Error('Admin API token is invalid. Please manage subscriptions manually in your HopRelay.com dashboard.');
+  }
+
+  // Check if this is a placeholder user ID
+  if (userId === 999999) {
+    throw new Error('Cannot create subscription automatically because your user account was verified via password authentication. Please manage subscriptions manually in your HopRelay.com dashboard.');
+  }
 
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
@@ -491,11 +549,20 @@ export async function createHopRelayApiKey({
   name,
   permissions,
 }) {
-  ensureSystemToken();
+  // Check if system token is available
+  if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
+    throw new Error('Admin API is not configured. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+  }
 
-  // Check if this is a placeholder user ID (from Admin API permission workaround)
+  try {
+    ensureSystemToken();
+  } catch (error) {
+    throw new Error('Admin API token is invalid. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+  }
+
+  // Check if this is a placeholder user ID (from password verification workaround)
   if (userId === 999999) {
-    throw new Error('Cannot create API key automatically due to Admin API permissions. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+    throw new Error('Cannot create API key automatically because your user account was verified via password authentication. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
   }
 
   const form = new FormData();
