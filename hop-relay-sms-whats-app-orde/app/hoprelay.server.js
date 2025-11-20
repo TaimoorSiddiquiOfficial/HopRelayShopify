@@ -563,11 +563,11 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
   // Don't trust the redirect alone - even wrong passwords get redirected to homepage
-  // We MUST verify the session actually works by accessing user info
+  // We MUST verify the session actually works by trying to fetch user's devices/data
   
-  // Try to get current user info - this should only return user data with valid session
+  // Try to get user's devices list - this should only work with valid session
   try {
-    const userInfoResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/system/user`, {
+    const devicesResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/devices/get`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
@@ -575,71 +575,60 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       redirect: "manual",
     });
     
-    console.log('[verifyHopRelayUserPassword] User info check status:', userInfoResp.status);
-    const userInfoLocation = userInfoResp.headers.get('location');
-    console.log('[verifyHopRelayUserPassword] User info redirect:', userInfoLocation);
+    console.log('[verifyHopRelayUserPassword] Devices check status:', devicesResp.status);
+    const devicesLocation = devicesResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Devices redirect:', devicesLocation);
     
     // If redirects to login, session is invalid
-    if (isLoginRedirect(userInfoLocation)) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (user info redirected to login)');
+    if (isLoginRedirect(devicesLocation)) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (devices redirected to login)');
       return false;
     }
     
     // If we get 401/403, session is invalid
-    if (userInfoResp.status === 401 || userInfoResp.status === 403) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (user info returned', userInfoResp.status + ')');
+    if (devicesResp.status === 401 || devicesResp.status === 403) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (devices returned', devicesResp.status + ')');
       return false;
     }
     
-    // If we get 200, verify it's actual user data with the correct email
-    if (userInfoResp.status === 200) {
+    // If we get 200, check the response
+    if (devicesResp.status === 200) {
       try {
-        const userInfoText = await userInfoResp.text();
-        console.log('[verifyHopRelayUserPassword] User info response preview:', userInfoText.substring(0, 200));
+        const devicesText = await devicesResp.text();
+        console.log('[verifyHopRelayUserPassword] Devices response preview:', devicesText.substring(0, 200));
         
         // Check if it's a login page
-        if (looksLoggedOut(userInfoText)) {
-          console.log('[verifyHopRelayUserPassword] Password valid: false (user info response looks like login page)');
+        if (looksLoggedOut(devicesText)) {
+          console.log('[verifyHopRelayUserPassword] Password valid: false (devices response looks like login page)');
           return false;
         }
         
-        // Try to parse as JSON and check status field
+        // Try to parse as JSON
         try {
-          const userInfo = JSON.parse(userInfoText);
+          const devicesData = JSON.parse(devicesText);
           
-          // Check if JSON response indicates unauthorized (status: 401 in response body)
-          if (userInfo.status === 401 || userInfo.status === 403) {
-            console.log('[verifyHopRelayUserPassword] Password valid: false (API JSON status:', userInfo.status + ')');
+          // Check if JSON response indicates unauthorized
+          if (devicesData.status === 401 || devicesData.status === 403) {
+            console.log('[verifyHopRelayUserPassword] Password valid: false (devices JSON status:', devicesData.status + ')');
             return false;
           }
           
-          // Check if response has successful status and valid data
-          if (userInfo.status === 200 && userInfo.data && userInfo.data.email === email) {
-            console.log('[verifyHopRelayUserPassword] Password valid: true (user info email matches)');
+          // Check if response has successful status (200) - means authenticated
+          if (devicesData.status === 200) {
+            console.log('[verifyHopRelayUserPassword] Password valid: true (devices API returned status 200)');
             return true;
           }
           
-          // Also accept if direct email field matches
-          if (userInfo.email === email) {
-            console.log('[verifyHopRelayUserPassword] Password valid: true (user info email matches)');
-            return true;
-          }
-          
-          console.log('[verifyHopRelayUserPassword] User info parsed but email mismatch or invalid status');
+          console.log('[verifyHopRelayUserPassword] Devices response status:', devicesData.status);
         } catch (jsonErr) {
-          console.log('[verifyHopRelayUserPassword] User info not JSON, checking for email in HTML');
-          // If not JSON, check if HTML contains the user's email
-          if (userInfoText.toLowerCase().includes(email.toLowerCase())) {
-            console.log('[verifyHopRelayUserPassword] Password valid: true (user email found in response)');
-            return true;
-          }
+          console.log('[verifyHopRelayUserPassword] Devices response not valid JSON');
         }
       } catch (e) {
-        console.log('[verifyHopRelayUserPassword] Error reading user info response:', e);
+        console.log('[verifyHopRelayUserPassword] Error reading devices response:', e);
       }
     }
   } catch (e) {
-    console.log('[verifyHopRelayUserPassword] User info check failed:', e);
+    console.log('[verifyHopRelayUserPassword] Devices check failed:', e);
   }
 
   // Fallback: Double-check by loading a protected page (/account/profile). If that page
