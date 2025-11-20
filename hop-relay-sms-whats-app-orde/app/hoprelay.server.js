@@ -563,11 +563,11 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
   // Don't trust the redirect alone - even wrong passwords get redirected to homepage
-  // We MUST verify the session actually works by checking a protected API endpoint
+  // We MUST verify the session actually works by accessing user info
   
-  // Try to access the user's account data via API - this should only work with valid session
+  // Try to get current user info - this should only return user data with valid session
   try {
-    const apiCheckResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/account`, {
+    const userInfoResp = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/system/user`, {
       method: "GET",
       headers: {
         Cookie: sessionCookie,
@@ -575,41 +575,56 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       redirect: "manual",
     });
     
-    console.log('[verifyHopRelayUserPassword] API check status:', apiCheckResp.status);
-    console.log('[verifyHopRelayUserPassword] API check redirect:', apiCheckResp.headers.get('location'));
+    console.log('[verifyHopRelayUserPassword] User info check status:', userInfoResp.status);
+    const userInfoLocation = userInfoResp.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] User info redirect:', userInfoLocation);
     
-    // If API redirects to login, session is invalid
-    if (isLoginRedirect(apiCheckResp.headers.get('location'))) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (API redirected to login)');
+    // If redirects to login, session is invalid
+    if (isLoginRedirect(userInfoLocation)) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (user info redirected to login)');
       return false;
     }
     
     // If we get 401/403, session is invalid
-    if (apiCheckResp.status === 401 || apiCheckResp.status === 403) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (API returned', apiCheckResp.status + ')');
+    if (userInfoResp.status === 401 || userInfoResp.status === 403) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (user info returned', userInfoResp.status + ')');
       return false;
     }
     
-    // If we get 200, check if response contains user data
-    if (apiCheckResp.status === 200) {
+    // If we get 200, verify it's actual user data with the correct email
+    if (userInfoResp.status === 200) {
       try {
-        const apiText = await apiCheckResp.text();
+        const userInfoText = await userInfoResp.text();
+        console.log('[verifyHopRelayUserPassword] User info response preview:', userInfoText.substring(0, 200));
         
-        // Check if it's actually account data or a login page
-        if (looksLoggedOut(apiText)) {
-          console.log('[verifyHopRelayUserPassword] Password valid: false (API response looks like login page)');
+        // Check if it's a login page
+        if (looksLoggedOut(userInfoText)) {
+          console.log('[verifyHopRelayUserPassword] Password valid: false (user info response looks like login page)');
           return false;
         }
         
-        // Valid response without login markers = success
-        console.log('[verifyHopRelayUserPassword] Password valid: true (API returned valid account data)');
-        return true;
+        // Try to parse as JSON and verify email matches
+        try {
+          const userInfo = JSON.parse(userInfoText);
+          if (userInfo && userInfo.email === email) {
+            console.log('[verifyHopRelayUserPassword] Password valid: true (user info email matches)');
+            return true;
+          }
+          console.log('[verifyHopRelayUserPassword] User info parsed but email mismatch or no email field');
+        } catch (jsonErr) {
+          console.log('[verifyHopRelayUserPassword] User info not JSON, checking for email in HTML');
+          // If not JSON, check if HTML contains the user's email
+          if (userInfoText.toLowerCase().includes(email.toLowerCase())) {
+            console.log('[verifyHopRelayUserPassword] Password valid: true (user email found in response)');
+            return true;
+          }
+        }
       } catch (e) {
-        console.log('[verifyHopRelayUserPassword] Error reading API response:', e);
+        console.log('[verifyHopRelayUserPassword] Error reading user info response:', e);
       }
     }
   } catch (e) {
-    console.log('[verifyHopRelayUserPassword] API check failed:', e);
+    console.log('[verifyHopRelayUserPassword] User info check failed:', e);
   }
 
   // Fallback: Double-check by loading a protected page (/account/profile). If that page
