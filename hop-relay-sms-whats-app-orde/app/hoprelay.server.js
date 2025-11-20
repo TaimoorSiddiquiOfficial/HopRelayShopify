@@ -545,12 +545,8 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // If we got a valid session cookie AND a successful redirect (not to login),
-  // that's a strong indicator of successful authentication
-  if (looksLikeSuccessRedirect && location) {
-    console.log('[verifyHopRelayUserPassword] Password valid: true (session cookie + success redirect)');
-    return true;
-  }
+  // Don't trust the redirect alone - even wrong passwords get redirected to homepage
+  // We MUST verify the session actually works by checking a protected page
 
   // Double-check by loading a protected page (/account/profile). If that page
   // redirects back to /auth/login, treat the password as invalid.
