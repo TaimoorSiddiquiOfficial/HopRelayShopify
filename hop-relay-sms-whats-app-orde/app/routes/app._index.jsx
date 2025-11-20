@@ -166,31 +166,45 @@ export const action = async ({ request }) => {
         let userId;
         let userEmail = email;
 
-        // ALWAYS verify password first to prevent unauthorized account linking
-        // This is critical because Admin API may not return all users due to permissions
-        console.log('[create-hoprelay-account] Verifying password for:', email);
+        // First see if the user already exists (Admin API may be limited by permissions)
+        let existing = null;
+        try {
+          existing = await findHopRelayUserByEmail(email);
+        } catch (lookupError) {
+          console.error("[create-hoprelay-account] Failed to lookup user:", lookupError);
+        }
+
+        // ALWAYS verify password to prevent hijacking existing accounts
+        console.log("[create-hoprelay-account] Verifying password for:", email);
         const isPasswordValid = await verifyHopRelayUserPassword({ email, password });
-        
+
         if (isPasswordValid) {
-          // Password is valid - account exists in HopRelay, try to find the user ID
-          console.log('[create-hoprelay-account] Password verified, searching for user...');
-          const existing = await findHopRelayUserByEmail(email);
-          
+          // Password is valid - trust the user and associate the correct account
           if (existing && existing.id !== undefined && existing.id !== null) {
-            // Found user via Admin API
             userId = Number(existing.id);
             userEmail = existing.email || email;
-            console.log('[create-hoprelay-account] Found existing user via Admin API:', userId);
+            console.log("[create-hoprelay-account] Password verified, existing user via Admin API:", userId);
           } else {
-            // Password is valid but user not found in Admin API (permission issue)
-            // Use placeholder ID - user exists in HopRelay but we can't see them
+            // Password valid but user not visible in Admin API (permissions issue)
             userId = 999999;
             userEmail = email;
-            console.log('[create-hoprelay-account] User verified but not visible in Admin API, using placeholder');
+            console.log("[create-hoprelay-account] Password verified but user not visible; using placeholder ID");
           }
         } else {
-          // Password verification failed - try to create new account
-          console.log('[create-hoprelay-account] Password verification failed, attempting to create new account...');
+          // Password invalid: block linking if the account already exists
+          if (existing && existing.id !== undefined && existing.id !== null) {
+            console.log("[create-hoprelay-account] Password invalid for existing account:", existing.id);
+            return {
+              ok: false,
+              type: "create-hoprelay-account",
+              error:
+                "Invalid password. If you already have a HopRelay account, please use the correct password or reset it.",
+              needsPasswordReset: true,
+            };
+          }
+
+          // No existing account found; attempt to create a brand new account
+          console.log("[create-hoprelay-account] No existing account found; creating new account...");
           try {
             const created = await createHopRelayUser({
               name,
@@ -199,13 +213,15 @@ export const action = async ({ request }) => {
             });
             userId = Number(created.id);
             userEmail = created.email || email;
-            console.log('[create-hoprelay-account] Successfully created new user:', userId);
+            console.log("[create-hoprelay-account] Successfully created new user:", userId);
           } catch (createError) {
-            // Creation failed - likely because email already exists
+            // Creation failed - likely because email actually exists but is hidden
+            console.error("[create-hoprelay-account] Failed to create user after invalid password:", createError);
             return {
               ok: false,
               type: "create-hoprelay-account",
-              error: "Invalid password. If you already have a HopRelay account, please use the correct password or use 'Reset Password' below.",
+              error:
+                "Invalid password. If you already have a HopRelay account, please use the correct password or reset it.",
               needsPasswordReset: true,
             };
           }
