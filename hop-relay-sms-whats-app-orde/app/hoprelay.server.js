@@ -278,19 +278,32 @@ export async function findHopRelayUserByEmail(email) {
 export async function createHopRelayUser({ name, email, password }) {
   ensureSystemToken();
 
-  // Check if email already exists
-  console.log('[createHopRelayUser] Checking if email exists:', email);
+  // First, check if the user exists and verify the password
+  console.log('[createHopRelayUser] Checking if user exists and verifying password...');
   const existingUser = await findHopRelayUserByEmail(email);
-  console.log('[createHopRelayUser] Existing user check:', existingUser);
   
   if (existingUser && existingUser.id) {
-    console.log('[createHopRelayUser] Email already exists in HopRelay:', email);
-    throw new Error(`Email address ${email} is already registered in HopRelay. Please use the password verification flow instead of creating a new account.`);
+    console.log('[createHopRelayUser] User exists, verifying password...');
+    
+    // Try to verify the password
+    const isPasswordValid = await verifyHopRelayUserPassword({ email, password });
+    
+    if (isPasswordValid) {
+      console.log('[createHopRelayUser] Password verified successfully');
+      return {
+        id: existingUser.id,
+        email: existingUser.email || email,
+      };
+    } else {
+      console.log('[createHopRelayUser] Password verification failed');
+      throw new Error(`Account exists but password is incorrect. Please use the correct password for your existing HopRelay account, or reset your password if you've forgotten it.`);
+    }
   }
 
-  // Try using the public registration endpoint first (doesn't require Admin API)
-  console.log('[createHopRelayUser] Attempting user creation via public registration endpoint...');
+  // If user doesn't exist, create a new account
+  console.log('[createHopRelayUser] Creating new user account...');
   try {
+    // Try using the public registration endpoint first
     const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
     const registerForm = new FormData();
     registerForm.set("name", name);
@@ -301,19 +314,17 @@ export async function createHopRelayUser({ name, email, password }) {
     const registerResponse = await fetch(`${baseUrl}/auth/register`, {
       method: "POST",
       body: registerForm,
-      redirect: 'manual', // Don't follow redirects
+      redirect: 'manual',
     });
     
     console.log('[createHopRelayUser] Public registration response status:', registerResponse.status);
     
-    // Registration typically returns 302 redirect on success
     if (registerResponse.status === 302 || registerResponse.status === 200) {
-      console.log('[createHopRelayUser] Public registration successful, now finding user...');
+      console.log('[createHopRelayUser] Public registration successful, finding new user...');
       
-      // Wait a moment for the user to be created
+      // Wait a moment for user creation
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Find the newly created user
       const newUser = await findHopRelayUserByEmail(email);
       if (newUser && newUser.id) {
         console.log('[createHopRelayUser] Found newly created user:', newUser);
@@ -323,16 +334,12 @@ export async function createHopRelayUser({ name, email, password }) {
         };
       }
     }
-    
-    // If public registration didn't work, try the text response
-    const regText = await registerResponse.text();
-    console.log('[createHopRelayUser] Public registration response:', regText.substring(0, 200));
   } catch (publicRegError) {
     console.log('[createHopRelayUser] Public registration failed:', publicRegError.message);
   }
 
   // Fall back to Admin API method
-  console.log('[createHopRelayUser] Falling back to Admin API method...');
+  console.log('[createHopRelayUser] Using Admin API fallback...');
   const form = new FormData();
   form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("name", name);
@@ -341,61 +348,35 @@ export async function createHopRelayUser({ name, email, password }) {
   form.set("timezone", DEFAULT_TIMEZONE);
   form.set("country", DEFAULT_COUNTRY);
   form.set("language", DEFAULT_LANGUAGE_ID);
-  // Optional fields - only send if needed
-  // form.set("credits", "0");
-  // form.set("theme", "light");
-  // form.set("role", DEFAULT_ROLE_ID);
-
-  console.log('[createHopRelayUser] Creating user with:', { 
-    name, 
-    email, 
-    hasPassword: !!password,
-    timezone: DEFAULT_TIMEZONE,
-    country: DEFAULT_COUNTRY,
-    language: DEFAULT_LANGUAGE_ID,
-    role: DEFAULT_ROLE_ID,
-    hasToken: !!HOPRELAY_SYSTEM_TOKEN,
-    tokenLength: HOPRELAY_SYSTEM_TOKEN.length,
-    url: `${HOPRELAY_ADMIN_BASE_URL}/create/user`
-  });
 
   const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
     method: "POST",
     body: form,
   });
 
-  console.log('[createHopRelayUser] Response status:', response.status);
-  
   let json;
   try {
     const text = await response.text();
-    console.log('[createHopRelayUser] Response text:', text);
     json = JSON.parse(text);
-    console.log('[createHopRelayUser] Response JSON:', JSON.stringify(json, null, 2));
     
-    // If error is "Invalid Parameters", it might be because email exists. Try direct login to verify.
     if (json.status === 400 && json.message === 'Invalid Parameters!') {
-      console.log('[createHopRelayUser] Got Invalid Parameters - email likely already exists');
       throw new Error('This email is already registered in HopRelay. Please use the correct password for this account.');
     }
   } catch (e) {
-    if (e.message.includes('email already exists') || e.message.includes('password is incorrect') || e.message.includes('Password is correct')) {
-      throw e; // Re-throw our custom error messages
+    if (e.message.includes('email already exists') || e.message.includes('password is incorrect')) {
+      throw e;
     }
-    console.error('[createHopRelayUser] Failed to parse response:', e);
     throw new Error('Failed to parse HopRelay response');
   }
   
   if (!response.ok || (json && json.status && json.status !== 200)) {
     const message = (json && json.message) || `HopRelay request failed with status ${response.status}`;
-    console.error('[createHopRelayUser] API Error:', message, json);
     const error = new Error(message);
     error.details = json;
     throw error;
   }
   
   if (!json.data || !json.data.id) {
-    console.error('[createHopRelayUser] Invalid response - missing data.id:', json);
     throw new Error(json.message || 'Failed to create user - invalid response from HopRelay');
   }
   
@@ -424,85 +405,58 @@ export async function sendHopRelayPasswordReset({ email }) {
 export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
   
-  // SECURITY: Verify password by attempting to authenticate and get user ID
-  // We'll use the SSO plugin endpoint which requires valid authentication
-  
-  if (!HOPRELAY_SSO_PLUGIN_TOKEN) {
-    console.log('[verifyHopRelayUserPassword] SSO plugin token not configured - cannot verify password');
-    return false;
-  }
-  
-  const baseUrl = HOPRELAY_WEB_BASE_URL;
-  const loginForm = new FormData();
-  loginForm.set("email", email);
-  loginForm.set("password", password);
-  
   try {
-    // Step 1: Login to get session cookie
-    const loginResp = await fetch(`${baseUrl}/auth/login`, {
+    // Method 1: Try direct authentication via HopRelay API
+    const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+    
+    // First, try to login using the standard authentication endpoint
+    const loginForm = new FormData();
+    loginForm.set("email", email);
+    loginForm.set("password", password);
+    
+    const loginResponse = await fetch(`${baseUrl}/auth/login`, {
       method: "POST",
       body: loginForm,
-      redirect: "manual",
+      redirect: "manual", // Don't follow redirects
     });
     
-    console.log('[verifyHopRelayUserPassword] Login response status:', loginResp.status);
+    console.log('[verifyHopRelayUserPassword] Login response status:', loginResponse.status);
     
-    // Extract session cookie
-    const cookies = loginResp.headers.get('set-cookie');
-    if (!cookies || !cookies.includes('PHPSESSID=')) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
+    // Check if login was successful (typically returns 302 for redirect on success)
+    if (loginResponse.status === 302 || loginResponse.status === 200) {
+      // Extract session cookie to verify
+      const cookies = loginResponse.headers.get('set-cookie');
+      if (cookies && cookies.includes('PHPSESSID=')) {
+        console.log('[verifyHopRelayUserPassword] Password valid: true (successful login with session)');
+        return true;
+      }
+    }
+    
+    // Method 2: If direct login fails, try using the Admin API to verify user exists
+    // and check if this is a password mismatch scenario
+    const existingUser = await findHopRelayUserByEmail(email);
+    if (existingUser) {
+      console.log('[verifyHopRelayUserPassword] User exists but login failed - likely incorrect password');
+      return false;
+    } else {
+      console.log('[verifyHopRelayUserPassword] User does not exist in HopRelay system');
       return false;
     }
     
-    const sessionMatch = cookies.match(/PHPSESSID=([^;]+)/);
-    if (!sessionMatch) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (failed to extract session)');
-      return false;
-    }
-    
-    const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
-    console.log('[verifyHopRelayUserPassword] Extracted session cookie');
-    
-    // Step 2: Try to get user info via plugin endpoint with session
-    const pluginUrl = `${baseUrl}/plugin?token=${HOPRELAY_SSO_PLUGIN_TOKEN}`;
-    const pluginResp = await fetch(pluginUrl, {
-      method: "GET",
-      headers: {
-        Cookie: sessionCookie,
-      },
-    });
-    
-    console.log('[verifyHopRelayUserPassword] Plugin endpoint status:', pluginResp.status);
-    
-    if (!pluginResp.ok) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (plugin endpoint failed)');
-      return false;
-    }
-    
-    let pluginData;
-    try {
-      pluginData = await pluginResp.json();
-    } catch (e) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (invalid JSON response)');
-      return false;
-    }
-    
-    // Log full plugin response for debugging
-    console.log('[verifyHopRelayUserPassword] Plugin response (full):', JSON.stringify(pluginData));
-    
-    // Valid password returns user data with matching email
-    if (pluginData.status === 200 && 
-        pluginData.data && 
-        pluginData.data.email && 
-        pluginData.data.email.toLowerCase() === email.toLowerCase()) {
-      console.log('[verifyHopRelayUserPassword] Password valid: true (plugin returned matching user data)');
-      return true;
-    }
-    
-    console.log('[verifyHopRelayUserPassword] Password valid: false (email mismatch or no user data)');
-    return false;
   } catch (error) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (exception:', error.message + ')');
+    console.log('[verifyHopRelayUserPassword] Password verification failed:', error.message);
+    
+    // Fallback: Check if user exists at all
+    try {
+      const existingUser = await findHopRelayUserByEmail(email);
+      if (existingUser) {
+        console.log('[verifyHopRelayUserPassword] User exists but verification failed - password likely incorrect');
+        return false;
+      }
+    } catch (findError) {
+      console.log('[verifyHopRelayUserPassword] Unable to check user existence:', findError.message);
+    }
+    
     return false;
   }
 }
