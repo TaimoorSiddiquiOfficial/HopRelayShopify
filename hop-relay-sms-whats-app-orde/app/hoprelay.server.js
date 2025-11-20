@@ -3,6 +3,7 @@ const HOPRELAY_ADMIN_BASE_URL =
 const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
 
+const HOPRELAY_ADMIN_API_TOKEN = process.env.HOPRELAY_ADMIN_API_TOKEN || "";
 const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
 const HOPRELAY_SSO_PLUGIN_TOKEN =
   process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
@@ -180,10 +181,14 @@ export async function createHopRelaySsoLink({
 }
 
 export async function getHopRelayPackages() {
-  ensureSystemToken();
+  if (!HOPRELAY_ADMIN_API_TOKEN) {
+    throw new Error(
+      "Missing HOPRELAY_ADMIN_API_TOKEN environment variable for HopRelay admin API.",
+    );
+  }
 
   const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/packages`);
-  url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
+  url.searchParams.set("token", HOPRELAY_ADMIN_API_TOKEN);
   url.searchParams.set("limit", "10");
   url.searchParams.set("page", "1");
 
