@@ -415,8 +415,12 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Response status:', response.status);
   
-  // Login successful returns 302 redirect or 200
-  const isValid = response.status === 302 || response.status === 200 || response.ok;
+  // Check the redirect location to determine if login was successful
+  const location = response.headers.get('location');
+  console.log('[verifyHopRelayUserPassword] Redirect location:', location);
+  
+  // Successful login redirects to /dashboard, failed login redirects back to /auth/login with error
+  const isValid = response.status === 302 && location && location.includes('/dashboard');
   console.log('[verifyHopRelayUserPassword] Password valid:', isValid);
   
   return isValid;
