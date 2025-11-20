@@ -424,146 +424,44 @@ export async function verifyHopRelayUserPassword({ email, password }) {
 
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
 
-  const isLoginRedirect = (loc) =>
-    !!loc && typeof loc === "string" && loc.includes("/auth/login");
-
-  const looksLoggedOut = (content) => {
-    const lower = content.toLowerCase();
-
-    return (
-      lower.includes("invalid credentials") ||
-      lower.includes("password is incorrect") ||
-      lower.includes("incorrect password") ||
-      lower.includes("auth/login") ||
-      lower.includes("signin") ||
-      lower.includes("sign in") ||
-      lower.includes(">login<") ||
-      lower.includes("login\"") ||
-      lower.includes("login<") ||
-      lower.includes("login </")
-    );
-  };
-  
-  const looksLoggedIn = (content) => {
-    const lower = content.toLowerCase();
-    
-    // Look for indicators that user is actually logged in
-    return (
-      lower.includes("logout") ||
-      lower.includes("log out") ||
-      lower.includes("sign out") ||
-      lower.includes("signout") ||
-      lower.includes("/auth/logout") ||
-      lower.includes("dashboard") ||
-      lower.includes("my account") ||
-      lower.includes("profile") ||
-      lower.includes("settings")
-    );
-  };
-
-  // Submit login without following redirects so we can inspect the outcome
+  // Submit login without following redirects
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     body: form,
     redirect: "manual",
   });
 
-  console.log('[verifyHopRelayUserPassword] Response status:', response.status);
+  console.log('[verifyHopRelayUserPassword] Login response status:', response.status);
   
   const location = response.headers.get('location');
   console.log('[verifyHopRelayUserPassword] Redirect location:', location);
   
-  // Check if we got a session cookie - successful login sets PHPSESSID
+  // If redirecting back to login, it's a failure
+  if (location && location.includes("/auth/login")) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (redirected to login)');
+    return false;
+  }
+
+  // Extract session cookie
   const cookies = response.headers.get('set-cookie');
   console.log('[verifyHopRelayUserPassword] Set-Cookie header:', cookies);
   
-  // Alternative verification 1: Check for successful redirect patterns
-  // Successful logins often redirect to root, dashboard, or home
-  const looksLikeSuccessRedirect = location && (
-    location === '/' ||
-    location.endsWith('/') ||
-    location.includes('/dashboard') ||
-    location.includes('/home') ||
-    location.includes('/account') ||
-    (!location.includes('/auth/login') && !location.includes('error'))
-  );
-  
-  // If redirecting back to login, it's definitely a failure
-  if (isLoginRedirect(location)) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (redirect to login)');
+  if (!cookies || !cookies.includes('PHPSESSID=')) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
     return false;
   }
 
-  // If we stayed on the same page with 200, inspect HTML for obvious login form / error markers
-  if (!location && response.status === 200) {
-    try {
-      const loginHtml = await response.text();
-      if (looksLoggedOut(loginHtml)) {
-        console.log(
-          "[verifyHopRelayUserPassword] Password valid: false (login page content looks logged out)",
-        );
-        return false;
-      }
-    } catch (e) {
-      console.log(
-        "[verifyHopRelayUserPassword] Could not inspect login response body, continuing with strict checks",
-        e,
-      );
-    }
-  }
-
-  // Require a PHPSESSID cookie to attempt session verification
-  let sessionCookie = null;
-  if (cookies) {
-    // Try multiple ways to extract PHPSESSID cookie
-    // Method 1: Direct regex match
-    let match = cookies.match(/PHPSESSID=[^;]+/);
-    if (match) {
-      sessionCookie = match[0];
-    } else {
-      // Method 2: Split by semicolon and find PHPSESSID
-      const cookieParts = cookies.split(';').map(c => c.trim());
-      const phpSessionPart = cookieParts.find(part => part.startsWith('PHPSESSID='));
-      if (phpSessionPart) {
-        sessionCookie = phpSessionPart;
-      }
-    }
-  }
-
-  if (!sessionCookie) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (no PHPSESSID cookie)');
-    
-    // Alternative verification 2: If we have a successful-looking redirect but no cookie detected,
-    // it might be a cookie parsing issue. Try one more verification attempt.
-    if (looksLikeSuccessRedirect && location) {
-      console.log('[verifyHopRelayUserPassword] No cookie detected, but redirect looks successful. Trying alternate verification...');
-      
-      // Try to follow the redirect and see if we get a valid page
-      try {
-        const followUpResp = await fetch(new URL(location, baseUrl).toString(), {
-          method: "GET",
-          redirect: "manual",
-        });
-        
-        const followUpLocation = followUpResp.headers.get('location');
-        
-        // If following the success redirect doesn't send us back to login, might be valid
-        if (!isLoginRedirect(followUpLocation) && followUpResp.status !== 401) {
-          console.log('[verifyHopRelayUserPassword] Password valid: true (alternate verification via redirect check)');
-          return true;
-        }
-      } catch (e) {
-        console.log('[verifyHopRelayUserPassword] Alternate verification failed:', e);
-      }
-    }
-    
+  const sessionMatch = cookies.match(/PHPSESSID=([^;]+)/);
+  if (!sessionMatch) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (failed to extract session)');
     return false;
   }
 
+  const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
   console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
 
-  // Verify session by accessing account settings page and checking for user's email in HTML
-  // This is more reliable than API endpoints which may require additional auth
+  // CRITICAL: Verify session by checking if user's email appears in settings page
+  // This is the ONLY reliable way to verify password is correct
   try {
     const settingsResp = await fetch(`${baseUrl}/account/settings`, {
       method: "GET",
@@ -575,132 +473,33 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     
     console.log('[verifyHopRelayUserPassword] Settings page status:', settingsResp.status);
     const settingsLocation = settingsResp.headers.get('location');
-    console.log('[verifyHopRelayUserPassword] Settings redirect:', settingsLocation);
     
-    // If redirects to login, session is invalid
-    if (isLoginRedirect(settingsLocation)) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (settings redirected to login)');
+    // If settings page redirects anywhere, session is invalid
+    if (settingsLocation) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (settings redirected to:', settingsLocation + ')');
       return false;
     }
     
-    // If we get 200, check if the page contains the user's email
-    if (settingsResp.status === 200) {
-      try {
-        const settingsHtml = await settingsResp.text();
-        console.log('[verifyHopRelayUserPassword] Settings page loaded, checking for email...');
-        
-        // Check if it looks like a login page
-        if (looksLoggedOut(settingsHtml)) {
-          console.log('[verifyHopRelayUserPassword] Password valid: false (settings page looks like login)');
-          return false;
-        }
-        
-        // Check if the user's email appears in the settings page
-        if (settingsHtml.includes(email)) {
-          console.log('[verifyHopRelayUserPassword] Password valid: true (email found in settings page)');
-          return true;
-        }
-        
-        console.log('[verifyHopRelayUserPassword] Email not found in settings page, checking profile...');
-      } catch (e) {
-        console.log('[verifyHopRelayUserPassword] Error reading settings page:', e);
-      }
+    // Settings page must return 200 OK
+    if (settingsResp.status !== 200) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (settings status:', settingsResp.status + ')');
+      return false;
     }
+    
+    // Check if the user's email appears in the settings page HTML
+    const settingsHtml = await settingsResp.text();
+    
+    if (!settingsHtml.includes(email)) {
+      console.log('[verifyHopRelayUserPassword] Password valid: false (email not found in settings page)');
+      return false;
+    }
+    
+    console.log('[verifyHopRelayUserPassword] Password valid: true (email found in settings page)');
+    return true;
   } catch (e) {
-    console.log('[verifyHopRelayUserPassword] Settings check failed:', e);
-  }
-
-  // Fallback: Double-check by loading a protected page (/account/profile). If that page
-  // redirects back to /auth/login, treat the password as invalid.
-  const verifyWithSession = async (startUrl) => {
-    let currentUrl = startUrl;
-
-    for (let i = 0; i < 3; i++) {
-      const resp = await fetch(currentUrl, {
-        method: "GET",
-        headers: {
-          Cookie: sessionCookie,
-        },
-        redirect: "manual",
-      });
-
-      const loc = resp.headers.get("location");
-      console.log(
-        "[verifyHopRelayUserPassword] Probe",
-        i,
-        "status:",
-        resp.status,
-        "location:",
-        loc,
-        "url:",
-        currentUrl,
-      );
-
-      if (resp.status === 200) {
-        // Check content - must have logged-in indicators and no logged-out markers
-        try {
-          const content = await resp.text();
-          
-          // First check for positive logged-in indicators
-          const hasLoggedInMarkers = looksLoggedIn(content);
-          const hasLoggedOutMarkers = looksLoggedOut(content);
-          
-          console.log('[verifyHopRelayUserPassword] Page check - logged in markers:', hasLoggedInMarkers, 'logged out markers:', hasLoggedOutMarkers);
-          
-          // If we have logged-in indicators, it's valid even if there are login links
-          if (hasLoggedInMarkers) {
-            console.log(
-              "[verifyHopRelayUserPassword] Password valid: true (page has logged-in indicators)",
-            );
-            return true;
-          }
-          
-          // If no logged-in indicators but has logged-out markers, definitely invalid
-          if (hasLoggedOutMarkers) {
-            console.log(
-              "[verifyHopRelayUserPassword] Password valid: false (page content looks logged out)",
-            );
-            return false;
-          }
-          
-          // If neither, keep checking (ambiguous)
-          console.log(
-            "[verifyHopRelayUserPassword] Page is ambiguous, continuing verification...",
-          );
-        } catch (e) {
-          console.log(
-            "[verifyHopRelayUserPassword] Error reading page content:",
-            e,
-          );
-        }
-      }
-
-      if ((resp.status === 301 || resp.status === 302) && loc) {
-        if (isLoginRedirect(loc)) {
-          console.log(
-            "[verifyHopRelayUserPassword] Password valid: false (protected page redirect to login)",
-          );
-          return false;
-        }
-
-        currentUrl = new URL(loc, baseUrl).toString();
-        continue;
-      }
-
-      // Any other status -> break and treat as failure
-      break;
-    }
-
-    console.log(
-      "[verifyHopRelayUserPassword] Password valid: false (protected page check failed)",
-    );
+    console.log('[verifyHopRelayUserPassword] Password valid: false (settings check failed:', e.message + ')');
     return false;
-  };
-
-  console.log(
-    "[verifyHopRelayUserPassword] Got session cookie, verifying via protected page...",
-  );
-  return verifyWithSession(`${baseUrl}/account/profile`);
+  }
 }
 
 export async function createHopRelaySubscription({
