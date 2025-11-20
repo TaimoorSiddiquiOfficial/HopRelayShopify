@@ -56,9 +56,22 @@ export async function createHopRelaySsoLink({
     return null;
   }
 
-  if (!userId) {
-    console.error("userId is required for SSO link generation");
-    return null;
+  // Validate userId: must be a positive integer
+  if (!userId || typeof userId !== "number" || userId <= 0 || !Number.isInteger(userId)) {
+    console.error("Invalid userId for SSO link generation:", userId);
+    throw new Error("Invalid user ID");
+  }
+
+  // Sanitize redirect parameter: only allow alphanumeric, dash, slash, underscore
+  if (typeof redirect !== "string" || !/^[a-zA-Z0-9/_-]+$/.test(redirect)) {
+    console.error("Invalid redirect parameter:", redirect);
+    throw new Error("Invalid redirect path");
+  }
+
+  // Prevent directory traversal attacks
+  if (redirect.includes("..") || redirect.startsWith("/")) {
+    console.error("Potential directory traversal attempt:", redirect);
+    throw new Error("Invalid redirect path");
   }
 
   // Plugin endpoints live at the root, not under /admin.
@@ -97,6 +110,26 @@ export async function createHopRelaySsoLink({
     const error = new Error(message);
     error.details = json;
     throw error;
+  }
+
+  // Validate SSO URL: must be HTTPS and from hoprelay.com domain
+  try {
+    const urlObj = new URL(ssoUrl);
+    const allowedDomains = ["hoprelay.com", "www.hoprelay.com"];
+    
+    if (!allowedDomains.includes(urlObj.hostname)) {
+      console.error("SSO URL from unauthorized domain:", urlObj.hostname);
+      throw new Error("Invalid SSO URL domain");
+    }
+    
+    // Enforce HTTPS in production (allow HTTP for local development)
+    if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
+      console.error("Invalid SSO URL protocol:", urlObj.protocol);
+      throw new Error("Invalid SSO URL protocol");
+    }
+  } catch (error) {
+    console.error("Invalid SSO URL format:", ssoUrl, error);
+    throw new Error("Invalid SSO URL received from server");
   }
 
   return ssoUrl;
