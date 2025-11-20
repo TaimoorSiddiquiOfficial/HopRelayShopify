@@ -9,7 +9,7 @@ import {
   createHopRelaySubscription,
   createHopRelayUser,
   deleteHopRelayApiKey,
-  deleteAllHopRelayApiKeys,
+  getHopRelayApiKeys,
   getHopRelayPackages,
   findHopRelayUserByEmail,
   getHopRelayCredits,
@@ -596,8 +596,18 @@ export const action = async ({ request }) => {
 
         // Delete ALL API keys for this user from HopRelay backend
         try {
-          const result = await deleteAllHopRelayApiKeys({ userId: existing.hoprelayUserId });
-          console.log(`Deleted ${result.deleted} API key(s) for user ${existing.hoprelayUserId}`);
+          const apiKeys = await getHopRelayApiKeys({ userId: existing.hoprelayUserId });
+          
+          if (apiKeys && apiKeys.length > 0) {
+            const deletePromises = apiKeys.map((apiKey) =>
+              deleteHopRelayApiKey({ id: apiKey.id }).catch((error) => {
+                console.error(`Failed to delete API key ${apiKey.id}:`, error);
+                return null;
+              })
+            );
+            await Promise.all(deletePromises);
+            console.log(`Deleted ${apiKeys.length} API key(s) for user ${existing.hoprelayUserId}`);
+          }
         } catch (error) {
           console.error("Failed to delete API keys from HopRelay:", error);
           // Continue to clear local state even if remote delete fails.
