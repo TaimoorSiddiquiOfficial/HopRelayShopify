@@ -605,6 +605,15 @@ export const action = async ({ request }) => {
     case "generate-sso-link": {
       const redirect = formData.get("redirect") || "dashboard";
       
+      // Validate redirect parameter from form data
+      if (typeof redirect !== "string" || redirect.length > 100) {
+        return {
+          ok: false,
+          type: "generate-sso-link",
+          error: "Invalid redirect parameter.",
+        };
+      }
+      
       try {
         const settings = await prisma.hopRelaySettings.findUnique({
           where: { shop: session.shop },
@@ -615,6 +624,16 @@ export const action = async ({ request }) => {
             ok: false,
             type: "generate-sso-link",
             error: "No HopRelay account linked.",
+          };
+        }
+
+        // Ensure hoprelayUserId is valid before passing to SSO function
+        if (typeof settings.hoprelayUserId !== "number" || settings.hoprelayUserId <= 0) {
+          console.error("Invalid hoprelayUserId in database:", settings.hoprelayUserId);
+          return {
+            ok: false,
+            type: "generate-sso-link",
+            error: "Invalid account configuration.",
           };
         }
 
