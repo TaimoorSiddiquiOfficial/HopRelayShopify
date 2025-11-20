@@ -422,112 +422,43 @@ export async function sendHopRelayPasswordReset({ email }) {
 }
 
 export async function verifyHopRelayUserPassword({ email, password }) {
-  const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
+  
+  // SECURITY: Verify password by attempting API authentication
+  // Try to get user secret key by logging in with credentials
+  const apiUrl = `${HOPRELAY_API_BASE_URL}/auth`;
+  
   const form = new FormData();
   form.set("email", email);
   form.set("password", password);
-
-  console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
-
-  // Submit login without following redirects
-  const response = await fetch(`${baseUrl}/auth/login`, {
-    method: "POST",
-    body: form,
-    redirect: "manual",
-  });
-
-  console.log('[verifyHopRelayUserPassword] Login response status:', response.status);
   
-  const location = response.headers.get('location');
-  console.log('[verifyHopRelayUserPassword] Redirect location:', location);
-  
-  // If redirecting back to login, it's a failure
-  if (location && location.includes("/auth/login")) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (redirected to login)');
-    return false;
-  }
-
-  // Extract session cookie
-  const cookies = response.headers.get('set-cookie');
-  console.log('[verifyHopRelayUserPassword] Set-Cookie header:', cookies);
-  
-  if (!cookies || !cookies.includes('PHPSESSID=')) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (no session cookie)');
-    return false;
-  }
-
-  const sessionMatch = cookies.match(/PHPSESSID=([^;]+)/);
-  if (!sessionMatch) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (failed to extract session)');
-    return false;
-  }
-
-  const sessionCookie = `PHPSESSID=${sessionMatch[1]}`;
-  console.log('[verifyHopRelayUserPassword] Extracted session cookie:', sessionCookie);
-
-  // CRITICAL: Verify session by trying to access API with the session cookie
-  // HopRelay's web endpoints are unreliable, so we'll check if we can get user data via API
   try {
-    // Try to access the plugin endpoint which requires authentication
-    const pluginResp = await fetch(`${baseUrl}/plugin`, {
-      method: "GET",
-      headers: {
-        Cookie: sessionCookie,
-      },
-      redirect: "manual",
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      body: form,
     });
     
-    console.log('[verifyHopRelayUserPassword] Plugin page status:', pluginResp.status);
-    const pluginLocation = pluginResp.headers.get('location');
-    console.log('[verifyHopRelayUserPassword] Plugin page redirect:', pluginLocation);
+    console.log('[verifyHopRelayUserPassword] API auth response status:', response.status);
     
-    // If it redirects to login, the session is invalid
-    if (pluginLocation && pluginLocation.includes('/auth/login')) {
-      console.log('[verifyHopRelayUserPassword] Password valid: false (plugin redirects to login - invalid session)');
-      return false;
+    const json = await parseJsonResponse(response);
+    
+    console.log('[verifyHopRelayUserPassword] API auth response:', JSON.stringify({
+      status: json.status,
+      message: json.message,
+      hasData: !!json.data,
+      hasSecret: json.data && !!json.data.secret
+    }));
+    
+    // Valid credentials return status 200 with user data including secret key
+    if (json.status === 200 && json.data && json.data.secret) {
+      console.log('[verifyHopRelayUserPassword] Password valid: true (API returned user secret)');
+      return true;
     }
     
-    // If plugin page is accessible (200 or 302 to non-login), try getting the page content
-    if (pluginResp.status === 200 || (pluginResp.status === 302 && pluginLocation && !pluginLocation.includes('/auth/login'))) {
-      // Follow the redirect manually to get the final page
-      let finalResp = pluginResp;
-      if (pluginResp.status === 302 && pluginLocation) {
-        const finalUrl = pluginLocation.startsWith('http') ? pluginLocation : `${baseUrl}${pluginLocation}`;
-        finalResp = await fetch(finalUrl, {
-          method: "GET",
-          headers: {
-            Cookie: sessionCookie,
-          },
-        });
-      }
-      
-      const html = await finalResp.text();
-      
-      // Log first 500 chars to see what's in the page
-      console.log('[verifyHopRelayUserPassword] Plugin page HTML preview:', html.substring(0, 500));
-      console.log('[verifyHopRelayUserPassword] Searching for email:', email);
-      console.log('[verifyHopRelayUserPassword] Email found in HTML:', html.includes(email));
-      console.log('[verifyHopRelayUserPassword] Email (lowercase) found:', html.toLowerCase().includes(email.toLowerCase()));
-      
-      // Check if the page contains the user's email (case-insensitive)
-      // Valid sessions will show user info, invalid sessions won't
-      if (html.toLowerCase().includes(email.toLowerCase())) {
-        console.log('[verifyHopRelayUserPassword] Password valid: true (email found in authenticated page)');
-        return true;
-      }
-      
-      // Also check if page contains common authenticated elements
-      const hasAuthElements = html.includes('user') || html.includes('account') || html.includes('dashboard');
-      console.log('[verifyHopRelayUserPassword] Page has auth elements:', hasAuthElements);
-      
-      console.log('[verifyHopRelayUserPassword] Password valid: false (email not found in page - invalid session)');
-      return false;
-    }
-    
-    console.log('[verifyHopRelayUserPassword] Password valid: false (unexpected plugin page response)');
+    console.log('[verifyHopRelayUserPassword] Password valid: false (API did not return user secret)');
     return false;
-  } catch (e) {
-    console.log('[verifyHopRelayUserPassword] Password valid: false (settings check failed:', e.message + ')');
+  } catch (error) {
+    console.log('[verifyHopRelayUserPassword] Password valid: false (API auth failed:', error.message + ')');
     return false;
   }
 }
