@@ -221,6 +221,9 @@ export async function findHopRelayUserByEmail(email) {
     const users = json.data || [];
     
     console.log(`[findHopRelayUserByEmail] Page ${page}: Found ${users.length} users`);
+    if (users.length > 0) {
+      console.log(`[findHopRelayUserByEmail] User emails on page ${page}:`, users.map(u => u.email));
+    }
 
     if (users.length === 0) {
       // No more users, stop searching
@@ -300,7 +303,23 @@ export async function createHopRelayUser({ name, email, password }) {
     console.log('[createHopRelayUser] Response text:', text);
     json = JSON.parse(text);
     console.log('[createHopRelayUser] Response JSON:', JSON.stringify(json, null, 2));
+    
+    // If error is "Invalid Parameters", it might be because email exists. Try direct login to verify.
+    if (json.status === 400 && json.message === 'Invalid Parameters!') {
+      console.log('[createHopRelayUser] Got Invalid Parameters - testing if it\'s due to existing email...');
+      const loginTest = await verifyHopRelayUserPassword({ email, password });
+      console.log('[createHopRelayUser] Login test result:', loginTest);
+      
+      if (loginTest) {
+        throw new Error('This email already exists in HopRelay. The password you entered is correct - the account was linked successfully in a previous attempt. Please refresh the page.');
+      } else {
+        throw new Error('This email might already exist in HopRelay, but the password is incorrect. Please use the "Reset Password" option to recover your account.');
+      }
+    }
   } catch (e) {
+    if (e.message.includes('email already exists') || e.message.includes('password is incorrect')) {
+      throw e; // Re-throw our custom error messages
+    }
     console.error('[createHopRelayUser] Failed to parse response:', e);
     throw new Error('Failed to parse HopRelay response');
   }
