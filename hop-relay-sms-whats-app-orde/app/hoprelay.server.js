@@ -4,6 +4,7 @@ const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
 
 const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
+const HOPRELAY_ADMIN_API_TOKEN = process.env.HOPRELAY_ADMIN_API_TOKEN || "";
 const HOPRELAY_SSO_PLUGIN_TOKEN =
   process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
 
