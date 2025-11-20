@@ -668,6 +668,7 @@ export default function Index() {
   const sendersFetcher = useFetcher();
   const notificationsFetcher = useFetcher();
   const campaignFetcher = useFetcher();
+  const ssoFetcher = useFetcher();
 
   const shopify = useAppBridge();
   const [activeTab, setActiveTab] = useState("account");
@@ -694,10 +695,15 @@ export default function Index() {
       revokeApiKeyFetcher.data ||
       sendersFetcher.data ||
       notificationsFetcher.data ||
-      campaignFetcher.data;
+      campaignFetcher.data ||
+      ssoFetcher.data;
 
     if (data?.ok) {
-      shopify.toast.show("Saved successfully");
+      if (data?.type === "generate-sso-link" && data?.url) {
+        window.open(data.url, "_blank");
+      } else {
+        shopify.toast.show("Saved successfully");
+      }
     } else if (data?.error) {
       shopify.toast.show(data.error);
     }
@@ -710,6 +716,7 @@ export default function Index() {
     sendersFetcher.data,
     notificationsFetcher.data,
     campaignFetcher.data,
+    ssoFetcher.data,
     shopify,
   ]);
 
@@ -1058,63 +1065,36 @@ export default function Index() {
 
             <s-stack direction="inline" gap="base">
               <s-button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData();
-                  formData.append("_action", "generate-sso-link");
-                  formData.append("redirect", "dashboard");
-                  const response = await fetch("?index", {
-                    method: "POST",
-                    body: formData,
-                  });
-                  const result = await response.json();
-                  if (result.ok && result.url) {
-                    window.open(result.url, "_blank");
-                  } else {
-                    window.open("https://hoprelay.com/dashboard", "_blank");
-                  }
+                onClick={() => {
+                  ssoFetcher.submit(
+                    { _action: "generate-sso-link", redirect: "dashboard" },
+                    { method: "POST" }
+                  );
                 }}
+                loading={ssoFetcher.state !== "idle"}
               >
                 Open HopRelay dashboard
               </s-button>
               <s-button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData();
-                  formData.append("_action", "generate-sso-link");
-                  formData.append("redirect", "dashboard/hosts/android");
-                  const response = await fetch("?index", {
-                    method: "POST",
-                    body: formData,
-                  });
-                  const result = await response.json();
-                  if (result.ok && result.url) {
-                    window.open(result.url, "_blank");
-                  } else {
-                    window.open("https://hoprelay.com/dashboard/hosts/android", "_blank");
-                  }
+                onClick={() => {
+                  ssoFetcher.submit(
+                    { _action: "generate-sso-link", redirect: "dashboard/hosts/android" },
+                    { method: "POST" }
+                  );
                 }}
+                loading={ssoFetcher.state !== "idle"}
                 variant="tertiary"
               >
                 Connect Android gateway
               </s-button>
               <s-button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData();
-                  formData.append("_action", "generate-sso-link");
-                  formData.append("redirect", "dashboard/hosts/whatsapp");
-                  const response = await fetch("?index", {
-                    method: "POST",
-                    body: formData,
-                  });
-                  const result = await response.json();
-                  if (result.ok && result.url) {
-                    window.open(result.url, "_blank");
-                  } else {
-                    window.open("https://hoprelay.com/dashboard/hosts/whatsapp", "_blank");
-                  }
+                onClick={() => {
+                  ssoFetcher.submit(
+                    { _action: "generate-sso-link", redirect: "dashboard/hosts/whatsapp" },
+                    { method: "POST" }
+                  );
                 }}
+                loading={ssoFetcher.state !== "idle"}
                 variant="tertiary"
               >
                 Add WhatsApp account
