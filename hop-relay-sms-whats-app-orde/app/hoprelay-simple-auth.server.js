@@ -69,8 +69,11 @@ export async function checkHopRelayUserExists(email) {
             u.email && u.email.toLowerCase() === email.toLowerCase()
           );
           if (user) {
-            console.log('[checkHopRelayUserExists] User found via admin API:', user.id);
+            console.log('[checkHopRelayUserExists] ✅ User found via admin API:', user.id);
             return { exists: true, userId: user.id };
+          } else {
+            console.log('[checkHopRelayUserExists] ❌ User not found in admin API results');
+            return { exists: false, userId: null };
           }
         }
       }
@@ -79,9 +82,30 @@ export async function checkHopRelayUserExists(email) {
     console.log('[checkHopRelayUserExists] Admin API check failed:', error.message);
   }
   
-  // Fallback: assume user might exist, let them verify with code
-  console.log('[checkHopRelayUserExists] Cannot determine - will send verification code');
-  return { exists: null, userId: null };
+  // Fallback: Try password reset to check if email exists
+  try {
+    const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
+    const resetForm = new FormData();
+    resetForm.set("email", email);
+    
+    const response = await fetch(`${baseUrl}/auth/recovery`, {
+      method: "POST",
+      body: resetForm,
+      redirect: 'manual',
+    });
+    
+    // If password reset succeeds, user exists
+    if (response.status === 302 || response.status === 200) {
+      console.log('[checkHopRelayUserExists] ✅ User exists (password reset accepted)');
+      return { exists: true, userId: null };
+    }
+  } catch (error) {
+    console.log('[checkHopRelayUserExists] Password reset check failed:', error.message);
+  }
+  
+  // Cannot determine - assume new user
+  console.log('[checkHopRelayUserExists] Cannot determine - assuming new user');
+  return { exists: false, userId: null };
 }
 
 /**
@@ -255,7 +279,7 @@ export async function verifyCode({ email, code }) {
  * Complete flow: Initialize account connection
  * Step 1: Check if user exists and determine next action
  */
-export async function initializeHopRelayAccount({ email, name, password, apiSecret }) {
+export async function initializeHopRelayAccount({ email, name, apiSecret }) {
   console.log('[initializeHopRelayAccount] Starting for:', email);
   
   // Check if user exists
@@ -263,29 +287,27 @@ export async function initializeHopRelayAccount({ email, name, password, apiSecr
   
   let userId = userCheck.userId;
   let isNewUser = false;
-  let requiresPassword = false;
   let generatedPassword = null;
   
-  // If user exists, just send verification code
-  if (userCheck.exists === true && userId) {
-    console.log('[initializeHopRelayAccount] Existing user found:', userId);
+  // If user EXISTS, just send verification code (NO password generation)
+  if (userCheck.exists === true) {
+    console.log('[initializeHopRelayAccount] ✅ Existing user found, sending verification code only');
     
-    // Send verification code to existing user
+    // Send verification code to existing user (NO password email)
     const codeResult = await sendVerificationCode({ email, name, userId, apiSecret });
     
     return {
       success: true,
       isNewUser: false,
       userId,
-      requiresPassword: false,
       verificationCodeSent: codeResult.success,
       testCode: codeResult.code, // Keep for testing
       message: 'Verification code sent to your email.',
     };
   }
   
-  // User doesn't exist or we can't determine - create account with random password
-  console.log('[initializeHopRelayAccount] New user - generating random password');
+  // User DOESN'T exist - create NEW account with auto-generated password
+  console.log('[initializeHopRelayAccount] 🆕 New user - generating random password');
   
   // Generate a secure random password
   const randomPassword = generateRandomPassword(20);
@@ -331,16 +353,19 @@ export async function initializeHopRelayAccount({ email, name, password, apiSecr
       // Wait for user to be created
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Try to get user ID
+      // Try to get user ID from HopRelay
       const newUserCheck = await checkHopRelayUserExists(email);
       if (newUserCheck.userId) {
         userId = newUserCheck.userId;
+        console.log('[initializeHopRelayAccount] ✅ Retrieved user ID:', userId);
+      } else {
+        console.log('[initializeHopRelayAccount] ⚠️ Could not retrieve user ID, will use placeholder');
       }
     } else {
       throw new Error('Failed to create account. Please try again later.');
     }
   } catch (error) {
-    console.log('[initializeHopRelayAccount] Could not create user:', error.message);
+    console.log('[initializeHopRelayAccount] ❌ Could not create user:', error.message);
     throw new Error('Failed to create HopRelay account: ' + error.message);
   }
   
@@ -351,11 +376,10 @@ export async function initializeHopRelayAccount({ email, name, password, apiSecr
     success: true,
     isNewUser: true,
     userId,
-    requiresPassword: false,
     verificationCodeSent: codeResult.success,
     testCode: codeResult.code, // Keep for testing
     generatedPassword,
-    message: 'Account created! Verification code sent to your email.',
+    message: 'Account created! Check your email for password and verification code.',
   };
 }
 
