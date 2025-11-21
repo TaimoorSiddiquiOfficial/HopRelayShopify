@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -1037,6 +1037,7 @@ export default function Index() {
 
   const shopify = useAppBridge();
   const [activeTab, setActiveTab] = useState("account");
+  const ssoWindowRef = useRef(null);
   const isAccountConnected =
     !!hoprelaySettings?.hoprelayUserId &&
     !!hoprelaySettings?.hoprelayUserEmail;
@@ -1066,9 +1067,14 @@ export default function Index() {
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
-        // Use App Bridge redirect to open external URL
-        // This bypasses popup blockers in embedded Shopify apps
-        shopify.redirect.dispatch(shopify.redirect.Action.REMOTE, data.url);
+        // Navigate the window that was opened synchronously in the click handler
+        if (ssoWindowRef.current && !ssoWindowRef.current.closed) {
+          ssoWindowRef.current.location = data.url;
+          ssoWindowRef.current = null;
+        } else {
+          // Fallback: try to open directly (may be blocked)
+          window.open(data.url, "_blank", "noopener,noreferrer");
+        }
       } else if (data?.type === "reset-password") {
         shopify.toast.show(`Password reset email sent to ${data.email}`);
       } else {
@@ -1597,6 +1603,8 @@ export default function Index() {
             <s-stack direction="inline" gap="base">
               <s-button
                 onClick={() => {
+                  // Open window synchronously during user interaction to avoid popup blockers
+                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard" },
                     { method: "POST" }
@@ -1608,6 +1616,8 @@ export default function Index() {
               </s-button>
               <s-button
                 onClick={() => {
+                  // Open window synchronously during user interaction to avoid popup blockers
+                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard/hosts/android" },
                     { method: "POST" }
@@ -1620,6 +1630,8 @@ export default function Index() {
               </s-button>
               <s-button
                 onClick={() => {
+                  // Open window synchronously during user interaction to avoid popup blockers
+                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard/hosts/whatsapp" },
                     { method: "POST" }
