@@ -16,7 +16,7 @@ const HOPRELAY_ADMIN_BASE_URL =
   process.env.HOPRELAY_ADMIN_BASE_URL || "https://hoprelay.com/admin";
 const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
-const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
+const HOPRELAY_ADMIN_API_TOKEN = process.env.HOPRELAY_ADMIN_API_TOKEN || "";
 const HOPRELAY_WEB_BASE_URL =
   process.env.HOPRELAY_WEB_BASE_URL ||
   HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
@@ -52,19 +52,23 @@ function generateVerificationCode() {
  */
 export async function checkHopRelayUserExists(email) {
   console.log('[checkHopRelayUserExists] Checking if user exists:', email);
+  console.log('[checkHopRelayUserExists] Admin API Token configured:', !!HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here');
   
   // Try the admin API first if available - this is the most reliable method
-  if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+  if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
     try {
       const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
-      url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
+      url.searchParams.set("token", HOPRELAY_ADMIN_API_TOKEN);
       url.searchParams.set("limit", "250");
       url.searchParams.set("page", "1");
 
+      console.log('[checkHopRelayUserExists] Calling Admin API /get/users');
       const response = await fetch(url, { method: "GET" });
       
+      console.log('[checkHopRelayUserExists] Response status:', response.status);
       if (response.ok) {
         const json = await response.json();
+        console.log('[checkHopRelayUserExists] Admin API response status:', json.status);
         if (json.status === 200 && json.data) {
           const user = json.data.find(u => 
             u.email && u.email.toLowerCase() === email.toLowerCase()
@@ -76,7 +80,13 @@ export async function checkHopRelayUserExists(email) {
             console.log('[checkHopRelayUserExists] ❌ User not found in admin API - will create new account');
             return { exists: false, userId: null };
           }
+        } else {
+          console.log('[checkHopRelayUserExists] ⚠️ Unexpected API response:', json);
         }
+      } else {
+        console.log('[checkHopRelayUserExists] ⚠️ Admin API request failed with status:', response.status);
+        const errorText = await response.text();
+        console.log('[checkHopRelayUserExists] Error response:', errorText);
       }
     } catch (error) {
       console.log('[checkHopRelayUserExists] Admin API check failed:', error.message);
@@ -140,10 +150,11 @@ export async function createHopRelayUserSimple({ name, email }) {
   }
   
   // Try admin API if available
-  if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+  if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
     try {
+      console.log('[createHopRelayUserSimple] Trying Admin API user creation');
       const form = new FormData();
-      form.set("token", HOPRELAY_SYSTEM_TOKEN);
+      form.set("token", HOPRELAY_ADMIN_API_TOKEN);
       form.set("name", name);
       form.set("email", email);
       form.set("password", randomPassword);
@@ -296,10 +307,11 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
     console.log('[initializeHopRelayAccount] Creating new user with auto-generated password');
     
     // Try admin API first if available (more reliable)
-    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+    if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
       try {
+        console.log('[initializeHopRelayAccount] ✅ Admin API token available, creating user via Admin API');
         const form = new FormData();
-        form.set("token", HOPRELAY_SYSTEM_TOKEN);
+        form.set("token", HOPRELAY_ADMIN_API_TOKEN);
         form.set("name", name);
         form.set("email", email);
         form.set("password", randomPassword);
@@ -308,13 +320,17 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
         form.set("language", DEFAULT_LANGUAGE_ID);
         form.set("role", "2"); // Regular user role
 
+        console.log('[initializeHopRelayAccount] Sending request to:', `${HOPRELAY_ADMIN_BASE_URL}/create/user`);
+        console.log('[initializeHopRelayAccount] User data:', { name, email, timezone: DEFAULT_TIMEZONE, country: DEFAULT_COUNTRY, language: DEFAULT_LANGUAGE_ID });
+        
         const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
           method: "POST",
           body: form,
         });
 
+        console.log('[initializeHopRelayAccount] Admin API HTTP status:', response.status);
         const json = await response.json();
-        console.log('[initializeHopRelayAccount] Admin API response:', json);
+        console.log('[initializeHopRelayAccount] Admin API full response:', JSON.stringify(json, null, 2));
         
         if (json.status === 200 && json.data && json.data.id) {
           console.log('[initializeHopRelayAccount] ✅ User created via admin API:', json.data.id);
@@ -343,12 +359,17 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
             userId,
             verificationCodeSent: codeResult.success,
             generatedPassword,
-            message: 'Account created! Check your email for password and verification code.',
+            message: 'Account created! Please check your email for login credentials and verification code.',
           };
+        } else {
+          console.log('[initializeHopRelayAccount] ⚠️ Admin API returned unsuccessful status:', json);
         }
       } catch (adminError) {
-        console.log('[initializeHopRelayAccount] Admin API creation failed:', adminError.message);
+        console.log('[initializeHopRelayAccount] ❌ Admin API creation failed:', adminError.message);
+        console.log('[initializeHopRelayAccount] Error stack:', adminError.stack);
       }
+    } else {
+      console.log('[initializeHopRelayAccount] ⚠️ Admin API token not configured, will use public registration fallback');
     }
     
     // Fallback to public registration
