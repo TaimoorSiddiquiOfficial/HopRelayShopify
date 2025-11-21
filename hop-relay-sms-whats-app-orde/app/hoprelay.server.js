@@ -450,10 +450,9 @@ export async function verifyHopRelayUserPassword({ email, password }) {
   console.log('[verifyHopRelayUserPassword] Verifying password for:', email);
   
   try {
-    // Method 1: Try direct authentication via HopRelay API
     const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
     
-    // First, try to login using the standard authentication endpoint
+    // Try to login using the standard authentication endpoint
     const loginForm = new FormData();
     loginForm.set("email", email);
     loginForm.set("password", password);
@@ -466,41 +465,51 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     
     console.log('[verifyHopRelayUserPassword] Login response status:', loginResponse.status);
     
-    // Check if login was successful (typically returns 302 for redirect on success)
-    if (loginResponse.status === 302 || loginResponse.status === 200) {
-      // Extract session cookie to verify
-      const cookies = loginResponse.headers.get('set-cookie');
-      if (cookies && cookies.includes('PHPSESSID=')) {
-        console.log('[verifyHopRelayUserPassword] Password valid: true (successful login with session)');
-        return true;
+    // Check redirect location to determine success or failure
+    const location = loginResponse.headers.get('location');
+    console.log('[verifyHopRelayUserPassword] Redirect location:', location);
+    
+    // Successful login redirects to dashboard, failed login redirects back to /auth/login with error
+    if (loginResponse.status === 302) {
+      // Check if redirect is to dashboard (success) or back to login (failure)
+      if (location && (location.includes('/dashboard') || location.includes('/home') || location === '/')) {
+        // Extract session cookie to double-verify
+        const cookies = loginResponse.headers.get('set-cookie');
+        if (cookies && cookies.includes('PHPSESSID=')) {
+          console.log('[verifyHopRelayUserPassword] Password valid: true (successful login to dashboard)');
+          return true;
+        }
+      } else if (location && (location.includes('/auth/login') || location.includes('error'))) {
+        console.log('[verifyHopRelayUserPassword] Password invalid: redirected back to login with error');
+        return false;
       }
     }
     
-    // Method 2: If direct login fails, try using the Admin API to verify user exists
-    // and check if this is a password mismatch scenario
-    const existingUser = await findHopRelayUserByEmail(email);
-    if (existingUser) {
-      console.log('[verifyHopRelayUserPassword] User exists but login failed - likely incorrect password');
-      return false;
-    } else {
-      console.log('[verifyHopRelayUserPassword] User does not exist in HopRelay system');
-      return false;
+    // If status is 200, check response body for error messages
+    if (loginResponse.status === 200) {
+      try {
+        const responseText = await loginResponse.text();
+        console.log('[verifyHopRelayUserPassword] Response preview:', responseText.substring(0, 200));
+        
+        // Check for error indicators in the HTML/response
+        if (responseText.includes('Invalid credentials') || 
+            responseText.includes('incorrect password') ||
+            responseText.includes('login failed') ||
+            responseText.includes('error')) {
+          console.log('[verifyHopRelayUserPassword] Password invalid: error message in response');
+          return false;
+        }
+      } catch (e) {
+        console.log('[verifyHopRelayUserPassword] Could not parse response body:', e.message);
+      }
     }
+    
+    // Fallback: If we can't determine from redirect/response, reject for security
+    console.log('[verifyHopRelayUserPassword] Could not verify password - rejecting for security');
+    return false;
     
   } catch (error) {
     console.log('[verifyHopRelayUserPassword] Password verification failed:', error.message);
-    
-    // Fallback: Check if user exists at all
-    try {
-      const existingUser = await findHopRelayUserByEmail(email);
-      if (existingUser) {
-        console.log('[verifyHopRelayUserPassword] User exists but verification failed - password likely incorrect');
-        return false;
-      }
-    } catch (findError) {
-      console.log('[verifyHopRelayUserPassword] Unable to check user existence:', findError.message);
-    }
-    
     return false;
   }
 }
