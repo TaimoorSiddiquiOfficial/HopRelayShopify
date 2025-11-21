@@ -345,6 +345,7 @@ export async function createHopRelayUser({ name, email, password }) {
     console.log('[createHopRelayUser] Password verification failed - checking if user exists...');
     
     // Check if user exists via admin API
+    let adminLookupAvailable = true;
     try {
       const existingUser = await findHopRelayUserByEmail(email);
       if (existingUser && existingUser.id) {
@@ -353,8 +354,14 @@ export async function createHopRelayUser({ name, email, password }) {
       }
     } catch (adminError) {
       console.log('[createHopRelayUser] Admin API lookup failed:', adminError.message);
+      adminLookupAvailable = false;
     }
-    
+
+    // If we cannot verify via password AND cannot confirm non-existence via Admin API, fail fast
+    if (!adminLookupAvailable) {
+      throw new Error('Unable to verify your credentials. Please use the correct password for your existing HopRelay account or reset your password.');
+    }
+
     // User doesn't exist or we can't verify - try to create new account
     console.log('[createHopRelayUser] Attempting to create new user account...');
     try {
@@ -375,7 +382,15 @@ export async function createHopRelayUser({ name, email, password }) {
       console.log('[createHopRelayUser] Public registration response status:', registerResponse.status);
       
       if (registerResponse.status === 302 || registerResponse.status === 200) {
-        console.log('[createHopRelayUser] Public registration successful, finding new user...');
+        console.log('[createHopRelayUser] Public registration likely accepted, verifying with login...');
+
+        // Verify that the new account can actually log in with the supplied password
+        const postRegisterLogin = await verifyHopRelayUserPassword({ email, password });
+        if (!postRegisterLogin) {
+          throw new Error('Registration could not be verified. Please confirm your password or try again.');
+        }
+
+        console.log('[createHopRelayUser] Public registration confirmed, finding new user...');
         
         // Wait a moment for user creation
         await new Promise(resolve => setTimeout(resolve, 1000));
