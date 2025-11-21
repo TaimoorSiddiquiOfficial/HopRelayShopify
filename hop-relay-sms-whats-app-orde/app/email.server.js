@@ -99,30 +99,33 @@ If you didn't request this code, please ignore this email.
  * npm install nodemailer
  */
 async function sendViaSMTP({ to, subject, html, text }) {
-  // Example configuration for Gmail
-  // You'll need to enable "Less secure app access" or use App Passwords
-  const nodemailer = await import('nodemailer');
-  
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  try {
+    const nodemailer = await import('nodemailer');
+    
+    const transporter = nodemailer.default.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
-  const info = await transporter.sendMail({
-    from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
-    to,
-    subject,
-    text,
-    html,
-  });
+    const info = await transporter.sendMail({
+      from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
+      to,
+      subject,
+      text,
+      html,
+    });
 
-  console.log('[sendViaSMTP] Message sent:', info.messageId);
-  return { success: true, method: 'smtp', messageId: info.messageId };
+    console.log('[sendViaSMTP] Message sent:', info.messageId);
+    return { success: true, method: 'smtp', messageId: info.messageId };
+  } catch (error) {
+    console.error('[sendViaSMTP] Failed to load nodemailer. Install with: npm install nodemailer');
+    throw new Error('SMTP email service not configured. Please install nodemailer or use a different email service.');
+  }
 }
 
 /**
@@ -130,23 +133,28 @@ async function sendViaSMTP({ to, subject, html, text }) {
  * npm install @sendgrid/mail
  */
 async function sendViaSendGrid({ to, subject, html, text }) {
-  const sgMail = await import('@sendgrid/mail');
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  try {
+    const sgMail = await import('@sendgrid/mail');
+    sgMail.default.setApiKey(process.env.SENDGRID_API_KEY);
 
-  const msg = {
-    to,
-    from: {
-      email: EMAIL_FROM,
-      name: EMAIL_FROM_NAME,
-    },
-    subject,
-    text,
-    html,
-  };
+    const msg = {
+      to,
+      from: {
+        email: EMAIL_FROM,
+        name: EMAIL_FROM_NAME,
+      },
+      subject,
+      text,
+      html,
+    };
 
-  const result = await sgMail.send(msg);
-  console.log('[sendViaSendGrid] Message sent');
-  return { success: true, method: 'sendgrid' };
+    const result = await sgMail.default.send(msg);
+    console.log('[sendViaSendGrid] Message sent');
+    return { success: true, method: 'sendgrid' };
+  } catch (error) {
+    console.error('[sendViaSendGrid] Failed to load @sendgrid/mail. Install with: npm install @sendgrid/mail');
+    throw new Error('SendGrid email service not configured. Please install @sendgrid/mail or use a different email service.');
+  }
 }
 
 /**
@@ -154,42 +162,47 @@ async function sendViaSendGrid({ to, subject, html, text }) {
  * npm install @aws-sdk/client-ses
  */
 async function sendViaAWSSES({ to, subject, html, text }) {
-  const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
-  
-  const client = new SESClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
-
-  const command = new SendEmailCommand({
-    Source: `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`,
-    Destination: {
-      ToAddresses: [to],
-    },
-    Message: {
-      Subject: {
-        Data: subject,
-        Charset: 'UTF-8',
+  try {
+    const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
+    
+    const client = new SESClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       },
-      Body: {
-        Text: {
-          Data: text,
+    });
+
+    const command = new SendEmailCommand({
+      Source: `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`,
+      Destination: {
+        ToAddresses: [to],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
           Charset: 'UTF-8',
         },
-        Html: {
-          Data: html,
-          Charset: 'UTF-8',
+        Body: {
+          Text: {
+            Data: text,
+            Charset: 'UTF-8',
+          },
+          Html: {
+            Data: html,
+            Charset: 'UTF-8',
+          },
         },
       },
-    },
-  });
+    });
 
-  const result = await client.send(command);
-  console.log('[sendViaAWSSES] Message sent:', result.MessageId);
-  return { success: true, method: 'ses', messageId: result.MessageId };
+    const result = await client.send(command);
+    console.log('[sendViaAWSSES] Message sent:', result.MessageId);
+    return { success: true, method: 'ses', messageId: result.MessageId };
+  } catch (error) {
+    console.error('[sendViaAWSSES] Failed to load @aws-sdk/client-ses. Install with: npm install @aws-sdk/client-ses');
+    throw new Error('AWS SES email service not configured. Please install @aws-sdk/client-ses or use a different email service.');
+  }
 }
 
 /**
@@ -197,19 +210,24 @@ async function sendViaAWSSES({ to, subject, html, text }) {
  * npm install resend
  */
 async function sendViaResend({ to, subject, html, text }) {
-  const { Resend } = await import('resend');
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const result = await resend.emails.send({
-    from: `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`,
-    to,
-    subject,
-    text,
-    html,
-  });
+    const result = await resend.emails.send({
+      from: `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`,
+      to,
+      subject,
+      text,
+      html,
+    });
 
-  console.log('[sendViaResend] Message sent:', result.id);
-  return { success: true, method: 'resend', messageId: result.id };
+    console.log('[sendViaResend] Message sent:', result.id);
+    return { success: true, method: 'resend', messageId: result.id };
+  } catch (error) {
+    console.error('[sendViaResend] Failed to load resend. Install with: npm install resend');
+    throw new Error('Resend email service not configured. Please install resend or use a different email service.');
+  }
 }
 
 /**
