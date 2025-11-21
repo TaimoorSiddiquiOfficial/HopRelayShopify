@@ -146,7 +146,7 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("_action");
 
@@ -217,7 +217,23 @@ export const action = async ({ request }) => {
           };
         }
 
-        // Save to database
+        // Get shop info for API key name
+        let shopName = "Shopify Store";
+        try {
+          const response = await admin.graphql(`#graphql
+            query shopInfo {
+              shop {
+                name
+              }
+            }
+          `);
+          const json = await response.json();
+          shopName = json.data.shop.name || shopName;
+        } catch (error) {
+          console.error("Failed to load shop name:", error);
+        }
+
+        // Save to database first
         const settings = await prisma.hopRelaySettings.upsert({
           where: { shop: session.shop },
           update: {
@@ -231,11 +247,46 @@ export const action = async ({ request }) => {
           },
         });
 
+        // Auto-create API key if we have a valid user ID
+        let apiKeyCreated = false;
+        let apiKeyError = null;
+        if (result.userId && result.userId !== 999999) {
+          try {
+            console.log('[verify-hoprelay-code] Auto-creating API key for user:', result.userId);
+            const apiKeyData = await createHopRelayApiKey({
+              userId: result.userId,
+              name: `Shopify - ${shopName}`,
+              permissions: ["send", "credits", "devices", "wa.accounts"],
+            });
+
+            if (apiKeyData?.secret) {
+              await prisma.hopRelaySettings.update({
+                where: { shop: session.shop },
+                data: {
+                  hoprelayApiKeyId: Number(apiKeyData.id) || null,
+                  hoprelayApiSecret: apiKeyData.secret,
+                  hoprelayApiKeyName: `Shopify - ${shopName}`,
+                },
+              });
+              apiKeyCreated = true;
+              console.log('[verify-hoprelay-code] ✅ API key created and saved successfully');
+            }
+          } catch (apiError) {
+            console.error('[verify-hoprelay-code] API key creation failed:', apiError);
+            apiKeyError = apiError.message;
+            // Don't fail verification if API key creation fails - user can create manually
+          }
+        }
+
         return {
           ok: true,
           type: "verify-hoprelay-code",
           hoprelayUserId: settings.hoprelayUserId,
-          message: "Account connected successfully!",
+          message: apiKeyCreated 
+            ? "Account connected successfully! API key created automatically." 
+            : "Account connected successfully!",
+          apiKeyCreated,
+          apiKeyError,
         };
       } catch (error) {
         console.error("Failed to verify code:", error);
