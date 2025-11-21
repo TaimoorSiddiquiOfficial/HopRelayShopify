@@ -25,7 +25,7 @@ const HOPRELAY_WEB_BASE_URL =
 const DEFAULT_COUNTRY = process.env.HOPRELAY_DEFAULT_COUNTRY || "US";
 const DEFAULT_TIMEZONE = process.env.HOPRELAY_DEFAULT_TIMEZONE || "America/New_York";
 const DEFAULT_LANGUAGE_ID = process.env.HOPRELAY_DEFAULT_LANGUAGE_ID || "1";
-const DEFAULT_ROLE_ID = process.env.HOPRELAY_DEFAULT_ROLE_ID || "2";
+const DEFAULT_ROLE_ID = process.env.HOPRELAY_DEFAULT_ROLE_ID || "1"; // Default user role (not admin)
 
 // In-memory store for verification codes (in production, use Redis or database)
 const verificationCodes = new Map();
