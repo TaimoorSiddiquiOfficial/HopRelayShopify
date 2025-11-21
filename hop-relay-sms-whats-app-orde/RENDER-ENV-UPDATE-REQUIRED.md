@@ -1,12 +1,16 @@
 # 🚨 CRITICAL: Render Environment Variables Update Required
 
 ## Issue
-Production logs show: `"Invalid system token supplied!"` because the Admin API token is not configured on Render.
+Production logs show TWO token issues:
+1. `"Invalid system token supplied!"` - Admin API token missing (FIXED in version 123)
+2. `"Invalid API token"` for SSO - Using wrong token (Admin token instead of SSO token)
 
-## What Was Fixed in Version 123
+## What Was Fixed in Version 123-124
 - ✅ Changed all Admin API calls to use `HOPRELAY_ADMIN_API_TOKEN` (instead of `HOPRELAY_SYSTEM_TOKEN`)
 - ✅ Added comprehensive logging to debug Admin API responses
 - ✅ Code is now correct and matches local .env configuration
+- ✅ **Version 124**: Added `credits` parameter to Admin API user creation (required by API)
+- ✅ **Version 124**: Uses `DEFAULT_ROLE_ID` environment variable for role assignment
 
 ## What You MUST Do on Render
 
@@ -21,6 +25,13 @@ Production logs show: `"Invalid system token supplied!"` because the Admin API t
 ```
 HOPRELAY_ADMIN_API_TOKEN=b9dfcbb971107f6a6742858ae2865e76f0f97641421972f30b03d3f9e565bd01
 ```
+
+#### ⚠️ CRITICAL: SSO Plugin Token (Currently Using Wrong Token!)
+**Current Issue**: SSO is using Admin API token instead of SSO token, causing "Invalid API token" errors.
+```
+HOPRELAY_SSO_PLUGIN_TOKEN=40ca899844a5fd8d0a8a16947ca3e0932debb2cf59f5bccdeb97d815f2e41707
+```
+**Make sure this is set to the DIFFERENT token value above!**
 
 #### Required for SMTP Email (Already in logs but confirm):
 ```

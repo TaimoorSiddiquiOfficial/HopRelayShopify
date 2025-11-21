@@ -158,9 +158,11 @@ export async function createHopRelayUserSimple({ name, email }) {
       form.set("name", name);
       form.set("email", email);
       form.set("password", randomPassword);
+      form.set("credits", "0"); // Start with 0 credits
       form.set("timezone", DEFAULT_TIMEZONE);
       form.set("country", DEFAULT_COUNTRY);
       form.set("language", DEFAULT_LANGUAGE_ID);
+      form.set("role", DEFAULT_ROLE_ID);
 
       const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
         method: "POST",
@@ -315,13 +317,22 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
         form.set("name", name);
         form.set("email", email);
         form.set("password", randomPassword);
+        form.set("credits", "0"); // Start with 0 credits - will be managed via packages
         form.set("timezone", DEFAULT_TIMEZONE);
         form.set("country", DEFAULT_COUNTRY);
         form.set("language", DEFAULT_LANGUAGE_ID);
-        form.set("role", "2"); // Regular user role
+        form.set("role", DEFAULT_ROLE_ID);
 
         console.log('[initializeHopRelayAccount] Sending request to:', `${HOPRELAY_ADMIN_BASE_URL}/create/user`);
-        console.log('[initializeHopRelayAccount] User data:', { name, email, timezone: DEFAULT_TIMEZONE, country: DEFAULT_COUNTRY, language: DEFAULT_LANGUAGE_ID });
+        console.log('[initializeHopRelayAccount] User data:', { 
+          name, 
+          email, 
+          credits: 0,
+          timezone: DEFAULT_TIMEZONE, 
+          country: DEFAULT_COUNTRY, 
+          language: DEFAULT_LANGUAGE_ID,
+          role: DEFAULT_ROLE_ID
+        });
         
         const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
           method: "POST",
