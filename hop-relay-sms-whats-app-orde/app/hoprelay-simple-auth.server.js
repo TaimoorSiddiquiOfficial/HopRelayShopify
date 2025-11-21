@@ -360,6 +360,7 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
           
           // Try to find the user by searching through ALL pages
           let foundUser = null;
+          console.log('[initializeHopRelayAccount] 🔍 Starting thorough user search across multiple pages...');
           for (let page = 1; page <= 5; page++) { // Search up to 5 pages (1250 users)
             try {
               const searchUrl = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
@@ -367,10 +368,22 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
               searchUrl.searchParams.set("limit", "250");
               searchUrl.searchParams.set("page", page.toString());
               
+              console.log(`[initializeHopRelayAccount] Searching page ${page}...`);
               const searchResponse = await fetch(searchUrl.toString());
               const searchJson = await searchResponse.json();
               
+              console.log(`[initializeHopRelayAccount] Page ${page} response:`, { 
+                status: searchJson.status, 
+                userCount: searchJson.data?.length || 0 
+              });
+              
               if (searchJson.status === 200 && searchJson.data) {
+                // Log first few emails on each page for debugging
+                if (searchJson.data.length > 0) {
+                  const sampleEmails = searchJson.data.slice(0, 3).map(u => u.email);
+                  console.log(`[initializeHopRelayAccount] Sample emails on page ${page}:`, sampleEmails);
+                }
+                
                 foundUser = searchJson.data.find(u => 
                   u.email && u.email.toLowerCase() === email.toLowerCase()
                 );
@@ -381,11 +394,15 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
                   isNewUser = false; // User already existed
                   break;
                 }
+              } else {
+                console.log(`[initializeHopRelayAccount] Page ${page} returned non-200 or no data`);
               }
             } catch (searchError) {
               console.log(`[initializeHopRelayAccount] Error searching page ${page}:`, searchError.message);
             }
           }
+          
+          console.log('[initializeHopRelayAccount] Search complete. Found user:', !!foundUser, 'User ID:', userId);
           
           if (userId) {
             // Found the user! Send verification code only (no welcome email)
