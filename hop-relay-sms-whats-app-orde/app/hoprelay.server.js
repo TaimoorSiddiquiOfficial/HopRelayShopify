@@ -483,6 +483,18 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     // HopRelay redirects to homepage for BOTH success and failure
     // We need to follow the redirect and check if we land on dashboard or login page
     if (loginResponse.status === 302 && location) {
+      // Parse cookies properly
+      let cookieHeader = '';
+      if (allCookies) {
+        // Extract just the cookie name=value pairs, ignore other attributes
+        const cookieParts = allCookies.split(';').map(c => c.trim());
+        const sessionCookie = cookieParts.find(c => c.startsWith('PHPSESSID='));
+        if (sessionCookie) {
+          cookieHeader = sessionCookie;
+          console.log('[verifyHopRelayUserPassword] Using session cookie:', sessionCookie);
+        }
+      }
+      
       // Follow the redirect manually to see where we end up
       let finalUrl = location;
       if (location.startsWith('//')) {
@@ -496,9 +508,9 @@ export async function verifyHopRelayUserPassword({ email, password }) {
       try {
         const followResponse = await fetch(finalUrl, {
           method: 'GET',
-          headers: {
-            'Cookie': allCookies || '', // Use the session cookie from login
-          },
+          headers: cookieHeader ? {
+            'Cookie': cookieHeader
+          } : {},
           redirect: 'manual',
         });
         
@@ -513,8 +525,11 @@ export async function verifyHopRelayUserPassword({ email, password }) {
           if (followLocation.includes('/auth/login')) {
             console.log('[verifyHopRelayUserPassword] Password invalid: final redirect to login page');
             return false;
+          } else if (followLocation.includes('/dashboard') || followLocation.includes('/home')) {
+            console.log('[verifyHopRelayUserPassword] Password valid: redirected to dashboard');
+            return true;
           } else {
-            console.log('[verifyHopRelayUserPassword] Password valid: session established');
+            console.log('[verifyHopRelayUserPassword] Password valid: session established (redirect to:', followLocation + ')');
             return true;
           }
         }
@@ -522,18 +537,26 @@ export async function verifyHopRelayUserPassword({ email, password }) {
         // If 200 OK, we successfully landed on the homepage (success)
         if (followResponse.status === 200) {
           const followText = await followResponse.text();
+          console.log('[verifyHopRelayUserPassword] Page content length:', followText.length);
+          console.log('[verifyHopRelayUserPassword] Page preview:', followText.substring(0, 500));
           
           // Check if the page contains login form (failure) or user content (success)
-          if (followText.includes('name="password"') || 
-              followText.includes('login-form') || 
-              followText.includes('auth/login')) {
-            console.log('[verifyHopRelayUserPassword] Password invalid: redirected to login form');
+          if (followText.includes('name="password"') && followText.includes('name="email"')) {
+            console.log('[verifyHopRelayUserPassword] Password invalid: page contains login form');
             return false;
-          } else if (followText.includes('dashboard') || 
-                     followText.includes('logout') || 
-                     followText.includes('account')) {
-            console.log('[verifyHopRelayUserPassword] Password valid: logged in to dashboard');
+          } else if (followText.includes('logout') || 
+                     followText.includes('Sign Out') ||
+                     followText.includes('sign out') ||
+                     followText.includes('/auth/logout')) {
+            console.log('[verifyHopRelayUserPassword] Password valid: page contains logout functionality');
             return true;
+          } else {
+            // If we can't determine, assume success if we have a valid session cookie
+            console.log('[verifyHopRelayUserPassword] Cannot determine from page content, checking session');
+            if (cookieHeader) {
+              console.log('[verifyHopRelayUserPassword] Password valid: has session cookie and reached homepage');
+              return true;
+            }
           }
         }
       } catch (followError) {
