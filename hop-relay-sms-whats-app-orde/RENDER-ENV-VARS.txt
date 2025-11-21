@@ -1,16 +1,36 @@
 # Copy these environment variables to Render Dashboard
 # After creating your web service, go to: Environment tab
 
+# Shopify Configuration
 SHOPIFY_API_KEY=2ba8e6117cba33bf73b057cb11b169db
 SHOPIFY_API_SECRET=get_from_partners_shopify_com
 SHOPIFY_APP_URL=will_be_your_render_url
 SCOPES=read_orders,read_customers
+
+# Database
 DATABASE_URL=will_be_provided_by_render_postgresql
+
+# HopRelay API Configuration
 HOPRELAY_ADMIN_BASE_URL=https://hoprelay.com/admin
 HOPRELAY_API_BASE_URL=https://hoprelay.com/api
-HOPRELAY_SYSTEM_TOKEN=your_hoprelay_token
+
+# HopRelay Authentication Tokens
+HOPRELAY_ADMIN_API_TOKEN=b9dfcbb971107f6a6742858ae2865e76f0f97641421972f30b03d3f9e565bd01
+HOPRELAY_SSO_PLUGIN_TOKEN=40ca899844a5fd8d0a8a16947ca3e0932debb2cf59f5bccdeb97d815f2e41707
+
+# HopRelay Defaults
 HOPRELAY_DEFAULT_COUNTRY=US
 HOPRELAY_DEFAULT_TIMEZONE=America/New_York
 HOPRELAY_DEFAULT_LANGUAGE_ID=1
 HOPRELAY_DEFAULT_ROLE_ID=2
+
+# Email Configuration (SMTP via Hostinger)
+EMAIL_SERVICE=smtp
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=info@hoprelay.com
+SMTP_PASS=Taimoor3109@
+
+# Node Environment
 NODE_ENV=production
