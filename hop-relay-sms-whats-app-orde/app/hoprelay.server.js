@@ -731,10 +731,13 @@ export async function createHopRelaySubscription({
   }
 
   const form = new FormData();
-  form.set("token", HOPRELAY_SYSTEM_TOKEN);
+  // Try Admin API Token instead of System Token for /admin endpoints
+  form.set("token", HOPRELAY_ADMIN_API_TOKEN);
   form.set("user", String(userId));
   form.set("package", String(packageId));
   form.set("duration", String(durationMonths));
+  
+  console.log('[createHopRelaySubscription] Using Admin API Token:', HOPRELAY_ADMIN_API_TOKEN ? `${HOPRELAY_ADMIN_API_TOKEN.substring(0, 8)}...${HOPRELAY_ADMIN_API_TOKEN.substring(HOPRELAY_ADMIN_API_TOKEN.length - 8)}` : 'NOT SET');
 
   const response = await fetch(
     `${HOPRELAY_ADMIN_BASE_URL}/create/subscription`,
@@ -773,12 +776,21 @@ export async function createHopRelayApiKey({
   }
 
   const form = new FormData();
-  form.set("token", HOPRELAY_SYSTEM_TOKEN);
+  // Try Admin API Token instead of System Token for /admin endpoints
+  form.set("token", HOPRELAY_ADMIN_API_TOKEN);
   form.set("id", String(userId));
   form.set("name", name);
 
   (permissions || []).forEach((permission) => {
     form.append("permissions[]", permission);
+  });
+
+  console.log('[createHopRelayApiKey] Calling API with Admin API Token:', {
+    url: `${HOPRELAY_ADMIN_BASE_URL}/create/apikey`,
+    userId,
+    name,
+    permissions,
+    tokenFirstLast: HOPRELAY_ADMIN_API_TOKEN ? `${HOPRELAY_ADMIN_API_TOKEN.substring(0, 8)}...${HOPRELAY_ADMIN_API_TOKEN.substring(HOPRELAY_ADMIN_API_TOKEN.length - 8)}` : 'NOT SET'
   });
 
   const response = await fetch(
@@ -788,6 +800,8 @@ export async function createHopRelayApiKey({
       body: form,
     },
   );
+  
+  console.log('[createHopRelayApiKey] Response status:', response.status);
 
   const json = await parseJsonResponse(response);
   return json.data;
