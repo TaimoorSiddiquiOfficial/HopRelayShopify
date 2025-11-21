@@ -51,6 +51,15 @@ export default defineConfig({
   plugins: [reactRouter(), tsconfigPaths()],
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      external: [
+        // Optional email service dependencies - only loaded when configured
+        'nodemailer',
+        '@sendgrid/mail',
+        '@aws-sdk/client-ses',
+        'resend',
+      ],
+    },
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react"],
