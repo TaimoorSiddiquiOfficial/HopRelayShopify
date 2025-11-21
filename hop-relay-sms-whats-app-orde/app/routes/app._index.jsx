@@ -250,6 +250,7 @@ export const action = async ({ request }) => {
         // Auto-create API key if we have a valid user ID
         let apiKeyCreated = false;
         let apiKeyError = null;
+        let freePackageAssigned = false;
         if (result.userId && result.userId !== 999999) {
           try {
             console.log('[verify-hoprelay-code] Auto-creating API key for user:', result.userId);
@@ -270,11 +271,49 @@ export const action = async ({ request }) => {
               });
               apiKeyCreated = true;
               console.log('[verify-hoprelay-code] ✅ API key created and saved successfully');
+              
+              // Auto-assign free package (package ID 1)
+              try {
+                console.log('[verify-hoprelay-code] Auto-assigning free package to user:', result.userId);
+                await createHopRelaySubscription({
+                  userId: result.userId,
+                  packageId: 1,
+                  durationMonths: 1,
+                });
+                
+                await prisma.hopRelaySettings.update({
+                  where: { shop: session.shop },
+                  data: {
+                    hoprelayPackageId: 1,
+                    hoprelayPlanName: 'Free Plan',
+                  },
+                });
+                freePackageAssigned = true;
+                console.log('[verify-hoprelay-code] ✅ Free package assigned successfully');
+              } catch (packageError) {
+                console.error('[verify-hoprelay-code] Free package assignment failed:', packageError);
+                // Don't fail verification if package assignment fails
+              }
             }
           } catch (apiError) {
             console.error('[verify-hoprelay-code] API key creation failed:', apiError);
             apiKeyError = apiError.message;
-            // Don't fail verification if API key creation fails - user can create manually
+            
+            // If API key already exists, try to fetch existing keys
+            if (apiError.message && apiError.message.includes('Invalid Parameters')) {
+              try {
+                console.log('[verify-hoprelay-code] API key may already exist, fetching existing keys...');
+                const existingKeys = await getHopRelayApiKeys({ userId: result.userId });
+                if (existingKeys && existingKeys.length > 0) {
+                  console.log('[verify-hoprelay-code] ✅ Found existing API key, using it');
+                  // User already has API key, no need to create
+                  apiKeyCreated = false;
+                  apiKeyError = null; // Clear error since this is expected
+                }
+              } catch (fetchError) {
+                console.error('[verify-hoprelay-code] Failed to fetch existing keys:', fetchError);
+              }
+            }
           }
         }
 
@@ -282,10 +321,13 @@ export const action = async ({ request }) => {
           ok: true,
           type: "verify-hoprelay-code",
           hoprelayUserId: settings.hoprelayUserId,
-          message: apiKeyCreated 
-            ? "Account connected successfully! API key created automatically." 
+          message: apiKeyCreated && freePackageAssigned
+            ? "Account connected successfully! API key created and free package assigned automatically." 
+            : apiKeyCreated
+            ? "Account connected successfully! API key created automatically."
             : "Account connected successfully!",
           apiKeyCreated,
+          freePackageAssigned,
           apiKeyError,
         };
       } catch (error) {
@@ -542,68 +584,6 @@ export const action = async ({ request }) => {
           ok: false,
           type: "create-hoprelay-apikey",
           error: error.message || "Unable to create API key.",
-        };
-      }
-    }
-
-    case "save-hoprelay-manual-apikey": {
-      const manualApiKeyId = formData.get("manualApiKeyId") || "";
-      const manualApiSecret = formData.get("manualApiSecret") || "";
-      const manualApiKeyName = formData.get("manualApiKeyName") || "";
-
-      if (!manualApiKeyId || !manualApiSecret) {
-        return {
-          ok: false,
-          type: "save-hoprelay-manual-apikey",
-          error: "Both API Key ID and API Secret are required.",
-        };
-      }
-
-      try {
-        const existing =
-          (await prisma.hopRelaySettings.findUnique({
-            where: { shop: session.shop },
-          })) || null;
-
-        if (!existing) {
-          return {
-            ok: false,
-            type: "save-hoprelay-manual-apikey",
-            error: "Create a HopRelay account first.",
-          };
-        }
-
-        // Test the API key by trying to get credits
-        try {
-          await getHopRelayCredits({ secret: manualApiSecret });
-        } catch (testError) {
-          return {
-            ok: false,
-            type: "save-hoprelay-manual-apikey",
-            error: "Invalid API key. Please check your API Key ID and Secret.",
-          };
-        }
-
-        await prisma.hopRelaySettings.update({
-          where: { shop: session.shop },
-          data: {
-            hoprelayApiKeyId: Number(manualApiKeyId),
-            hoprelayApiKeyName: manualApiKeyName,
-            hoprelayApiSecret: manualApiSecret,
-          },
-        });
-
-        return {
-          ok: true,
-          type: "save-hoprelay-manual-apikey",
-          hoprelayApiKeyId: Number(manualApiKeyId),
-        };
-      } catch (error) {
-        console.error("Failed to save manual API key:", error);
-        return {
-          ok: false,
-          type: "save-hoprelay-manual-apikey",
-          error: error.message || "Unable to save API key.",
         };
       }
     }
@@ -1560,49 +1540,6 @@ export default function Index() {
               </createApiKeyFetcher.Form>
             )}
             
-            {/* Manual API Key Input Section */}
-            <s-divider />
-            <s-stack direction="block" gap="base">
-              <s-heading level="3">Manual API Key Entry</s-heading>
-              <s-text variation="subdued" size="small">
-                If automatic API key creation fails, you can create an API key manually in your HopRelay.com dashboard and enter it here.
-              </s-text>
-              <createApiKeyFetcher.Form method="post">
-                <input
-                  type="hidden"
-                  name="_action"
-                  value="save-hoprelay-manual-apikey"
-                />
-                <s-stack direction="block" gap="base">
-                  <s-text-field
-                    label="API Key ID"
-                    name="manualApiKeyId"
-                    placeholder="Enter your API Key ID from HopRelay dashboard"
-                  />
-                  <s-text-field
-                    label="API Secret"
-                    name="manualApiSecret"
-                    type="password"
-                    placeholder="Enter your API Secret from HopRelay dashboard"
-                  />
-                  <s-text-field
-                    label="API Key Name"
-                    name="manualApiKeyName"
-                    value={`Shopify - ${shop.name}`}
-                  />
-                  <s-button
-                    type="submit"
-                    loading={
-                      ["loading", "submitting"].includes(
-                        createApiKeyFetcher.state,
-                      )
-                    }
-                  >
-                    Save Manual API Key
-                  </s-button>
-                </s-stack>
-              </createApiKeyFetcher.Form>
-            </s-stack>
           </s-section>
         </s-section>
       )}
