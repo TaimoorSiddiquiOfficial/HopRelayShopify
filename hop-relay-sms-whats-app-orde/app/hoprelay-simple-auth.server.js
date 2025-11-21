@@ -311,12 +311,12 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
     console.log('[initializeHopRelayAccount] Creating new user with auto-generated password');
     
     // Try admin API first if available (more reliable)
-    // NOTE: /create/user requires SYSTEM TOKEN, not Admin API Token
-    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+    // NOTE: /admin/create/user requires ADMIN API TOKEN (system_admin_token in ZENDER)
+    if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
       try {
-        console.log('[initializeHopRelayAccount] ✅ System token available, creating user via Admin API');
+        console.log('[initializeHopRelayAccount] ✅ Admin API token available, creating user via Admin API');
         const form = new FormData();
-        form.set("token", HOPRELAY_SYSTEM_TOKEN);
+        form.set("token", HOPRELAY_ADMIN_API_TOKEN);
         form.set("name", name);
         form.set("email", email);
         form.set("password", randomPassword);
