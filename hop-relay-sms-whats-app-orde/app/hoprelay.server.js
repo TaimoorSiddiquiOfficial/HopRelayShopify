@@ -704,15 +704,15 @@ export async function createHopRelaySubscription({
   packageId,
   durationMonths,
 }) {
-  // Check if Admin API token is available
-  if (!HOPRELAY_ADMIN_API_TOKEN || HOPRELAY_ADMIN_API_TOKEN === 'your_hoprelay_admin_api_token_here') {
-    throw new Error('Admin API is not configured. Please manage subscriptions manually in your HopRelay.com dashboard.');
+  // Check if System token is available
+  if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
+    throw new Error('System API is not configured. Please manage subscriptions manually in your HopRelay.com dashboard.');
   }
 
   try {
-    ensureAdminToken();
+    ensureSystemToken();
   } catch (error) {
-    throw new Error('Admin API token is invalid. Please manage subscriptions manually in your HopRelay.com dashboard.');
+    throw new Error('System token is invalid. Please manage subscriptions manually in your HopRelay.com dashboard.');
   }
 
   // Check if this is a placeholder user ID
@@ -721,7 +721,7 @@ export async function createHopRelaySubscription({
   }
 
   const form = new FormData();
-  form.set("token", HOPRELAY_ADMIN_API_TOKEN);
+  form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("user", String(userId));
   form.set("package", String(packageId));
   form.set("duration", String(durationMonths));
@@ -743,15 +743,15 @@ export async function createHopRelayApiKey({
   name,
   permissions,
 }) {
-  // Check if Admin API token is available
-  if (!HOPRELAY_ADMIN_API_TOKEN || HOPRELAY_ADMIN_API_TOKEN === 'your_hoprelay_admin_api_token_here') {
-    throw new Error('Admin API is not configured. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+  // Check if System token is available
+  if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
+    throw new Error('System API is not configured. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
   }
 
   try {
-    ensureAdminToken();
+    ensureSystemToken();
   } catch (error) {
-    throw new Error('Admin API token is invalid. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
+    throw new Error('System token is invalid. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
   }
 
   // Check if this is a placeholder user ID (from password verification workaround)
@@ -760,7 +760,7 @@ export async function createHopRelayApiKey({
   }
 
   const form = new FormData();
-  form.set("token", HOPRELAY_ADMIN_API_TOKEN);
+  form.set("token", HOPRELAY_SYSTEM_TOKEN);
   form.set("id", String(userId));
   form.set("name", name);
 
