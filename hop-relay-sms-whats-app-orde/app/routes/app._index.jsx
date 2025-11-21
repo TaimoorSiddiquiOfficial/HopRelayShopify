@@ -256,7 +256,17 @@ export const action = async ({ request }) => {
             const apiKeyData = await createHopRelayApiKey({
               userId: result.userId,
               name: `Shopify - ${shopName}`,
-              permissions: ["send", "credits", "devices", "wa.accounts"],
+              permissions: [
+                "get_credits",
+                "get_contacts", 
+                "get_devices",
+                "get_wa_accounts",
+                "get_subscription",
+                "sms_send",
+                "wa_send",
+                "sms_send_bulk",
+                "wa_send_bulk"
+              ],
             });
 
             if (apiKeyData?.secret) {
