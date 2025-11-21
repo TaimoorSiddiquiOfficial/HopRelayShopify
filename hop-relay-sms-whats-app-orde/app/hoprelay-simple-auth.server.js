@@ -17,6 +17,7 @@ const HOPRELAY_ADMIN_BASE_URL =
 const HOPRELAY_API_BASE_URL =
   process.env.HOPRELAY_API_BASE_URL || "https://hoprelay.com/api";
 const HOPRELAY_ADMIN_API_TOKEN = process.env.HOPRELAY_ADMIN_API_TOKEN || "";
+const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
 const HOPRELAY_WEB_BASE_URL =
   process.env.HOPRELAY_WEB_BASE_URL ||
   HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
@@ -150,11 +151,11 @@ export async function createHopRelayUserSimple({ name, email }) {
   }
   
   // Try admin API if available
-  if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
+  if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
     try {
-      console.log('[createHopRelayUserSimple] Trying Admin API user creation');
+      console.log('[createHopRelayUserSimple] Trying Admin API user creation with System Token');
       const form = new FormData();
-      form.set("token", HOPRELAY_ADMIN_API_TOKEN);
+      form.set("token", HOPRELAY_SYSTEM_TOKEN);
       form.set("name", name);
       form.set("email", email);
       form.set("password", randomPassword);
@@ -310,11 +311,12 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
     console.log('[initializeHopRelayAccount] Creating new user with auto-generated password');
     
     // Try admin API first if available (more reliable)
-    if (HOPRELAY_ADMIN_API_TOKEN && HOPRELAY_ADMIN_API_TOKEN !== 'your_hoprelay_admin_api_token_here') {
+    // NOTE: /create/user requires SYSTEM TOKEN, not Admin API Token
+    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
       try {
-        console.log('[initializeHopRelayAccount] ✅ Admin API token available, creating user via Admin API');
+        console.log('[initializeHopRelayAccount] ✅ System token available, creating user via Admin API');
         const form = new FormData();
-        form.set("token", HOPRELAY_ADMIN_API_TOKEN);
+        form.set("token", HOPRELAY_SYSTEM_TOKEN);
         form.set("name", name);
         form.set("email", email);
         form.set("password", randomPassword);
