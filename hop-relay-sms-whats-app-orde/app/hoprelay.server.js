@@ -28,6 +28,21 @@ function ensureSystemToken() {
   }
 }
 
+// Generate a random password for new users
+function generateRandomPassword(length = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+// Generate a 6-digit verification code
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 async function parseJsonResponse(response) {
   let json;
   try {
@@ -268,9 +283,7 @@ export async function findHopRelayUserByEmail(email) {
         detailMessage.includes("invalid system token")
       ) {
         console.log("[findHopRelayUserByEmail] Admin API rejected system token, skipping lookup");
-        const tokenError = new Error("HopRelay Admin API token is invalid");
-        tokenError.code = "ADMIN_TOKEN_INVALID";
-        throw tokenError;
+        return null;
       }
 
       console.log(`[findHopRelayUserByEmail] Failed to fetch page ${page}:`, error.message);
@@ -966,3 +979,12 @@ export async function deleteAllHopRelayApiKeys({ userId }) {
     throw error;
   }
 }
+
+// Export simplified authentication functions
+export {
+  initializeHopRelayAccount,
+  checkHopRelayUserExists,
+  createHopRelayUserSimple,
+  sendVerificationCode,
+  verifyCode,
+} from "./hoprelay-simple-auth.server.js";
