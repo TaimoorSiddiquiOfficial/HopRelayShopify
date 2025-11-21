@@ -354,6 +354,75 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
           console.log('[initializeHopRelayAccount] ✅ User created via admin API:', json.data.id);
           isNewUser = true;
           userId = json.data.id;
+        } else if (json.status === 400 && json.message === 'Invalid Parameters!') {
+          // This likely means the email already exists
+          console.log('[initializeHopRelayAccount] ⚠️ Admin API returned 400 - email might already exist, searching more thoroughly...');
+          
+          // Try to find the user by searching through ALL pages
+          let foundUser = null;
+          for (let page = 1; page <= 5; page++) { // Search up to 5 pages (1250 users)
+            try {
+              const searchUrl = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
+              searchUrl.searchParams.set("token", HOPRELAY_ADMIN_API_TOKEN);
+              searchUrl.searchParams.set("limit", "250");
+              searchUrl.searchParams.set("page", page.toString());
+              
+              const searchResponse = await fetch(searchUrl.toString());
+              const searchJson = await searchResponse.json();
+              
+              if (searchJson.status === 200 && searchJson.data) {
+                foundUser = searchJson.data.find(u => 
+                  u.email && u.email.toLowerCase() === email.toLowerCase()
+                );
+                
+                if (foundUser) {
+                  console.log(`[initializeHopRelayAccount] ✅ Found existing user on page ${page}:`, foundUser.id);
+                  userId = foundUser.id;
+                  isNewUser = false; // User already existed
+                  break;
+                }
+              }
+            } catch (searchError) {
+              console.log(`[initializeHopRelayAccount] Error searching page ${page}:`, searchError.message);
+            }
+          }
+          
+          if (userId) {
+            // Found the user! Send verification code only (no welcome email)
+            console.log('[initializeHopRelayAccount] ✅ User exists, sending verification code only');
+            const codeResult = await sendVerificationCode({ email, name, userId, apiSecret });
+            
+            return {
+              success: true,
+              isNewUser: false,
+              userId,
+              verificationCodeSent: codeResult.success,
+              message: 'Verification code sent to your email.',
+            };
+          }
+          
+          console.log('[initializeHopRelayAccount] ⚠️ Could not find user in Admin API after thorough search, will try public registration');
+        } else {
+          console.log('[initializeHopRelayAccount] ⚠️ Admin API returned unexpected response');
+        }
+        
+        // If we got here and have a userId from the search above, use it
+        if (userId && !isNewUser) {
+          console.log('[initializeHopRelayAccount] ✅ Using found user ID:', userId);
+          const codeResult = await sendVerificationCode({ email, name, userId, apiSecret });
+          
+          return {
+            success: true,
+            isNewUser: false,
+            userId,
+            verificationCodeSent: codeResult.success,
+            message: 'Verification code sent to your email.',
+          };
+        }
+        
+        // Continue with the flow if Admin API created the user successfully
+        if (isNewUser && userId) {
+          console.log('[initializeHopRelayAccount] ✅ User created via admin API:', userId);
           
           // Send welcome email with auto-generated password
           try {
