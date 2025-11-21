@@ -344,8 +344,15 @@ export async function createHopRelayUser({ name, email, password }) {
   } else {
     console.log('[createHopRelayUser] Password verification failed - checking if user exists...');
     
+    // If admin API is not available, fail fast to avoid guessing or creating accounts
+    const adminLookupAvailable =
+      !!HOPRELAY_SYSTEM_TOKEN &&
+      HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here';
+    if (!adminLookupAvailable) {
+      throw new Error('Unable to verify your credentials because HopRelay Admin API is not configured. Please use the correct password for your existing HopRelay account or reset your password.');
+    }
+
     // Check if user exists via admin API
-    let adminLookupAvailable = true;
     try {
       const existingUser = await findHopRelayUserByEmail(email);
       if (existingUser && existingUser.id) {
@@ -354,11 +361,6 @@ export async function createHopRelayUser({ name, email, password }) {
       }
     } catch (adminError) {
       console.log('[createHopRelayUser] Admin API lookup failed:', adminError.message);
-      adminLookupAvailable = false;
-    }
-
-    // If we cannot verify via password AND cannot confirm non-existence via Admin API, fail fast
-    if (!adminLookupAvailable) {
       throw new Error('Unable to verify your credentials. Please use the correct password for your existing HopRelay account or reset your password.');
     }
 
