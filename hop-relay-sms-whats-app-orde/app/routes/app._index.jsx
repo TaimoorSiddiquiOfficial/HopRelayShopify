@@ -1066,14 +1066,9 @@ export default function Index() {
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
-        // Use Shopify App Bridge to open external URL in new tab
-        // This works better than window.open() which may be blocked by popup blockers
-        const url = data.url;
-        const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          // Popup blocked, show toast with fallback
-          shopify.toast.show("Popup blocked. Please allow popups for this site.");
-        }
+        // Use App Bridge redirect to open external URL
+        // This bypasses popup blockers in embedded Shopify apps
+        shopify.redirect.dispatch(shopify.redirect.Action.REMOTE, data.url);
       } else if (data?.type === "reset-password") {
         shopify.toast.show(`Password reset email sent to ${data.email}`);
       } else {
