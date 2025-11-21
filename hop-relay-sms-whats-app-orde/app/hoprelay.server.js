@@ -8,6 +8,13 @@ const HOPRELAY_SYSTEM_TOKEN = process.env.HOPRELAY_SYSTEM_TOKEN || "";
 const HOPRELAY_SSO_PLUGIN_TOKEN =
   process.env.HOPRELAY_SSO_PLUGIN_TOKEN || "";
 
+// Debug: Log token configuration on startup (only first/last 8 chars for security)
+console.log('[hoprelay.server.js] Token Configuration:', {
+  adminApiToken: HOPRELAY_ADMIN_API_TOKEN ? `${HOPRELAY_ADMIN_API_TOKEN.substring(0, 8)}...${HOPRELAY_ADMIN_API_TOKEN.substring(HOPRELAY_ADMIN_API_TOKEN.length - 8)}` : 'NOT SET',
+  systemToken: HOPRELAY_SYSTEM_TOKEN ? `${HOPRELAY_SYSTEM_TOKEN.substring(0, 8)}...${HOPRELAY_SYSTEM_TOKEN.substring(HOPRELAY_SYSTEM_TOKEN.length - 8)}` : 'NOT SET',
+  ssoPluginToken: HOPRELAY_SSO_PLUGIN_TOKEN ? `${HOPRELAY_SSO_PLUGIN_TOKEN.substring(0, 8)}...${HOPRELAY_SSO_PLUGIN_TOKEN.substring(HOPRELAY_SSO_PLUGIN_TOKEN.length - 8)}` : 'NOT SET',
+});
+
 // Public web base (used for /plugin endpoint). Falls back to stripping `/admin`.
 const HOPRELAY_WEB_BASE_URL =
   process.env.HOPRELAY_WEB_BASE_URL ||
@@ -704,6 +711,9 @@ export async function createHopRelaySubscription({
   packageId,
   durationMonths,
 }) {
+  console.log('[createHopRelaySubscription] Called with:', { userId, packageId, durationMonths });
+  console.log('[createHopRelaySubscription] HOPRELAY_SYSTEM_TOKEN status:', HOPRELAY_SYSTEM_TOKEN ? `SET (${HOPRELAY_SYSTEM_TOKEN.substring(0, 8)}...${HOPRELAY_SYSTEM_TOKEN.substring(HOPRELAY_SYSTEM_TOKEN.length - 8)})` : 'NOT SET');
+  
   // Check if System token is available
   if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
     throw new Error('System API is not configured. Please manage subscriptions manually in your HopRelay.com dashboard.');
@@ -743,6 +753,9 @@ export async function createHopRelayApiKey({
   name,
   permissions,
 }) {
+  console.log('[createHopRelayApiKey] Called with:', { userId, name, permissions });
+  console.log('[createHopRelayApiKey] HOPRELAY_SYSTEM_TOKEN status:', HOPRELAY_SYSTEM_TOKEN ? `SET (${HOPRELAY_SYSTEM_TOKEN.substring(0, 8)}...${HOPRELAY_SYSTEM_TOKEN.substring(HOPRELAY_SYSTEM_TOKEN.length - 8)})` : 'NOT SET');
+  
   // Check if System token is available
   if (!HOPRELAY_SYSTEM_TOKEN || HOPRELAY_SYSTEM_TOKEN === 'your_hoprelay_system_token_here') {
     throw new Error('System API is not configured. Please create an API key manually in your HopRelay.com dashboard and enter it in the "API Key Management" section below.');
