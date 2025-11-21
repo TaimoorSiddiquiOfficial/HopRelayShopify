@@ -16,9 +16,13 @@ HOPRELAY_API_BASE_URL=https://hoprelay.com/api
 
 # HopRelay Authentication Tokens
 # CRITICAL: All three tokens are required for different endpoints
-# Admin API Token - Required for /admin/create/user and /admin/get/users (maps to system_admin_token in ZENDER)
+# Admin API Token - Required for ALL /admin endpoints including:
+#   - /admin/create/user
+#   - /admin/get/users
+#   - /admin/create/apikey (uses this, NOT system token!)
+#   - /admin/create/subscription (uses this, NOT system token!)
 HOPRELAY_ADMIN_API_TOKEN=b9dfcbb971107f6a6742858ae2865e76f0f97641421972f30b03d3f9e565bd01
-# System Token - Required for /admin/create/apikey, /admin/create/subscription, /admin/get/packages
+# System Token - Used for /admin/get/packages and other system-level operations
 HOPRELAY_SYSTEM_TOKEN=515f2c5deead70eb5cfa4e4d6a63b536e3c61fd3148bccd72b24985ca236acc8
 # SSO Plugin Token - Required for SSO dashboard login feature
 HOPRELAY_SSO_PLUGIN_TOKEN=40ca899844a5fd8d0a8a16947ca3e0932debb2cf59f5bccdeb97d815f2e41707

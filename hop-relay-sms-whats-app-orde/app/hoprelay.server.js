@@ -800,28 +800,8 @@ export async function createHopRelayApiKey({
       body: form,
     },
   );
-  
-  console.log('[createHopRelayApiKey] Response status:', response.status);
-  
-  const responseText = await response.text();
-  console.log('[createHopRelayApiKey] Response body:', responseText);
-  
-  let json;
-  try {
-    json = JSON.parse(responseText);
-  } catch (e) {
-    throw new Error(`Failed to parse response: ${responseText}`);
-  }
-  
-  console.log('[createHopRelayApiKey] Parsed response:', json);
-  
-  if (!response.ok || (json && json.status && json.status !== 200)) {
-    const message = (json && json.message) || `HopRelay request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.details = json;
-    throw error;
-  }
-  
+
+  const json = await parseJsonResponse(response);
   return json.data;
 }
 
