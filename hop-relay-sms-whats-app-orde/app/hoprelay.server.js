@@ -469,42 +469,75 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     const location = loginResponse.headers.get('location');
     console.log('[verifyHopRelayUserPassword] Redirect location:', location);
     
-    // Successful login redirects to dashboard, failed login redirects back to /auth/login with error
-    if (loginResponse.status === 302) {
-      // Normalize the location URL to handle protocol-relative URLs
-      let normalizedLocation = location;
-      if (location && location.startsWith('//')) {
-        normalizedLocation = 'https:' + location;
+    // Get all cookies for debugging
+    const allCookies = loginResponse.headers.get('set-cookie');
+    console.log('[verifyHopRelayUserPassword] All cookies:', allCookies);
+    
+    // Get all headers for debugging
+    const allHeaders = {};
+    loginResponse.headers.forEach((value, key) => {
+      allHeaders[key] = value;
+    });
+    console.log('[verifyHopRelayUserPassword] All headers:', JSON.stringify(allHeaders));
+    
+    // HopRelay redirects to homepage for BOTH success and failure
+    // We need to follow the redirect and check if we land on dashboard or login page
+    if (loginResponse.status === 302 && location) {
+      // Follow the redirect manually to see where we end up
+      let finalUrl = location;
+      if (location.startsWith('//')) {
+        finalUrl = 'https:' + location;
+      } else if (location.startsWith('/')) {
+        finalUrl = `${baseUrl}${location}`;
       }
       
-      // Check if redirect is to dashboard/home (success) or back to login (failure)
-      if (location) {
-        // Success patterns: dashboard, home, root path, or hoprelay.com homepage
-        const isSuccessRedirect = 
-          location.includes('/dashboard') || 
-          location.includes('/home') || 
-          location === '/' ||
-          location === '//hoprelay.com' ||
-          location === 'https://hoprelay.com' ||
-          location === 'http://hoprelay.com';
+      console.log('[verifyHopRelayUserPassword] Following redirect to:', finalUrl);
+      
+      try {
+        const followResponse = await fetch(finalUrl, {
+          method: 'GET',
+          headers: {
+            'Cookie': allCookies || '', // Use the session cookie from login
+          },
+          redirect: 'manual',
+        });
         
-        // Failure patterns: back to login page or error parameter
-        const isFailureRedirect = 
-          location.includes('/auth/login') || 
-          location.includes('error=') ||
-          location.includes('?error');
+        const followLocation = followResponse.headers.get('location');
+        console.log('[verifyHopRelayUserPassword] Follow response status:', followResponse.status);
+        console.log('[verifyHopRelayUserPassword] Follow redirect location:', followLocation);
         
-        if (isSuccessRedirect && !isFailureRedirect) {
-          // Verify session cookie is present
-          const cookies = loginResponse.headers.get('set-cookie');
-          if (cookies && cookies.includes('PHPSESSID=')) {
-            console.log('[verifyHopRelayUserPassword] Password valid: true (successful login - redirect to:', location + ')');
+        // If it redirects again, check where
+        if (followResponse.status === 302 && followLocation) {
+          // Success: stays on homepage or goes to dashboard
+          // Failure: redirects back to /auth/login
+          if (followLocation.includes('/auth/login')) {
+            console.log('[verifyHopRelayUserPassword] Password invalid: final redirect to login page');
+            return false;
+          } else {
+            console.log('[verifyHopRelayUserPassword] Password valid: session established');
             return true;
           }
-        } else if (isFailureRedirect) {
-          console.log('[verifyHopRelayUserPassword] Password invalid: redirected back to login with error');
-          return false;
         }
+        
+        // If 200 OK, we successfully landed on the homepage (success)
+        if (followResponse.status === 200) {
+          const followText = await followResponse.text();
+          
+          // Check if the page contains login form (failure) or user content (success)
+          if (followText.includes('name="password"') || 
+              followText.includes('login-form') || 
+              followText.includes('auth/login')) {
+            console.log('[verifyHopRelayUserPassword] Password invalid: redirected to login form');
+            return false;
+          } else if (followText.includes('dashboard') || 
+                     followText.includes('logout') || 
+                     followText.includes('account')) {
+            console.log('[verifyHopRelayUserPassword] Password valid: logged in to dashboard');
+            return true;
+          }
+        }
+      } catch (followError) {
+        console.log('[verifyHopRelayUserPassword] Error following redirect:', followError.message);
       }
     }
     
