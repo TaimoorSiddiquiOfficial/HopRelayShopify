@@ -268,7 +268,9 @@ export async function findHopRelayUserByEmail(email) {
         detailMessage.includes("invalid system token")
       ) {
         console.log("[findHopRelayUserByEmail] Admin API rejected system token, skipping lookup");
-        return null;
+        const tokenError = new Error("HopRelay Admin API token is invalid");
+        tokenError.code = "ADMIN_TOKEN_INVALID";
+        throw tokenError;
       }
 
       console.log(`[findHopRelayUserByEmail] Failed to fetch page ${page}:`, error.message);
@@ -345,7 +347,7 @@ export async function createHopRelayUser({ name, email, password }) {
     console.log('[createHopRelayUser] Password verification failed - checking if user exists...');
     
     // If admin API is not available, fail fast to avoid guessing or creating accounts
-    const adminLookupAvailable =
+    let adminLookupAvailable =
       !!HOPRELAY_SYSTEM_TOKEN &&
       HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here';
     if (!adminLookupAvailable) {
@@ -361,6 +363,9 @@ export async function createHopRelayUser({ name, email, password }) {
       }
     } catch (adminError) {
       console.log('[createHopRelayUser] Admin API lookup failed:', adminError.message);
+      if (adminError.code === 'ADMIN_TOKEN_INVALID') {
+        adminLookupAvailable = false;
+      }
       throw new Error('Unable to verify your credentials. Please use the correct password for your existing HopRelay account or reset your password.');
     }
 
