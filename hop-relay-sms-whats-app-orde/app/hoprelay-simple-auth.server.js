@@ -53,9 +53,9 @@ function generateVerificationCode() {
 export async function checkHopRelayUserExists(email) {
   console.log('[checkHopRelayUserExists] Checking if user exists:', email);
   
-  try {
-    // Try the admin API first if available
-    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+  // Try the admin API first if available - this is the most reliable method
+  if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+    try {
       const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/users`);
       url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
       url.searchParams.set("limit", "250");
@@ -73,39 +73,18 @@ export async function checkHopRelayUserExists(email) {
             console.log('[checkHopRelayUserExists] ✅ User found via admin API:', user.id);
             return { exists: true, userId: user.id };
           } else {
-            console.log('[checkHopRelayUserExists] ❌ User not found in admin API results');
+            console.log('[checkHopRelayUserExists] ❌ User not found in admin API - will create new account');
             return { exists: false, userId: null };
           }
         }
       }
+    } catch (error) {
+      console.log('[checkHopRelayUserExists] Admin API check failed:', error.message);
     }
-  } catch (error) {
-    console.log('[checkHopRelayUserExists] Admin API check failed:', error.message);
   }
   
-  // Fallback: Try password reset to check if email exists
-  try {
-    const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
-    const resetForm = new FormData();
-    resetForm.set("email", email);
-    
-    const response = await fetch(`${baseUrl}/auth/recovery`, {
-      method: "POST",
-      body: resetForm,
-      redirect: 'manual',
-    });
-    
-    // If password reset succeeds, user exists
-    if (response.status === 302 || response.status === 200) {
-      console.log('[checkHopRelayUserExists] ✅ User exists (password reset accepted)');
-      return { exists: true, userId: null };
-    }
-  } catch (error) {
-    console.log('[checkHopRelayUserExists] Password reset check failed:', error.message);
-  }
-  
-  // Cannot determine - assume new user
-  console.log('[checkHopRelayUserExists] Cannot determine - assuming new user');
+  // If admin API not available, assume new user (safer to create than fail)
+  console.log('[checkHopRelayUserExists] Admin API not available - assuming new user');
   return { exists: false, userId: null };
 }
 
