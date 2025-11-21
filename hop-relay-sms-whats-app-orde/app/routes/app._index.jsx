@@ -1353,74 +1353,27 @@ export default function Index() {
           )}
           
           {isAccountConnected && (
-            <>
-              <s-section heading="HopRelay Dashboard Access">
-                <s-stack direction="block" gap="base">
-                  <s-text variation="subdued" size="small">
-                    Access your HopRelay dashboard to manage SMS/WhatsApp accounts, view detailed analytics, and configure advanced features.
-                  </s-text>
-                  <s-stack direction="inline" gap="base">
-                    <s-button
-                      onClick={() => {
-                        ssoFetcher.submit(
-                          { _action: "generate-sso-link", redirect: "dashboard" },
-                          { method: "POST" }
-                        );
-                      }}
-                      loading={ssoFetcher.state !== "idle"}
-                    >
-                      Open HopRelay Dashboard
-                    </s-button>
-                    <s-button
-                      onClick={() => {
-                        ssoFetcher.submit(
-                          { _action: "generate-sso-link", redirect: "dashboard/hosts/android" },
-                          { method: "POST" }
-                        );
-                      }}
-                      loading={ssoFetcher.state !== "idle"}
-                      variant="secondary"
-                    >
-                      Add SMS Gateway
-                    </s-button>
-                    <s-button
-                      onClick={() => {
-                        ssoFetcher.submit(
-                          { _action: "generate-sso-link", redirect: "dashboard/hosts/whatsapp" },
-                          { method: "POST" }
-                        );
-                      }}
-                      loading={ssoFetcher.state !== "idle"}
-                      variant="secondary"
-                    >
-                      Add WhatsApp Account
-                    </s-button>
-                  </s-stack>
-                </s-stack>
-              </s-section>
-              
-              <s-section heading="Account Access">
-                <s-stack direction="block" gap="base">
-                  <s-text variation="subdued" size="small">
-                    Need to reset your HopRelay.com password?
-                  </s-text>
-                  <resetPasswordFetcher.Form method="post">
-                    <input type="hidden" name="_action" value="reset-password" />
-                    <s-button
-                      type="submit"
-                      variant="secondary"
-                      loading={
-                        ["loading", "submitting"].includes(
-                          resetPasswordFetcher.state,
-                        )
-                      }
-                    >
-                      Send Password Reset Email
-                    </s-button>
-                  </resetPasswordFetcher.Form>
-                </s-stack>
-              </s-section>
-            </>
+            <s-section heading="Account Access">
+              <s-stack direction="block" gap="base">
+                <s-text variation="subdued" size="small">
+                  Need to reset your HopRelay.com password?
+                </s-text>
+                <resetPasswordFetcher.Form method="post">
+                  <input type="hidden" name="_action" value="reset-password" />
+                  <s-button
+                    type="submit"
+                    variant="secondary"
+                    loading={
+                      ["loading", "submitting"].includes(
+                        resetPasswordFetcher.state,
+                      )
+                    }
+                  >
+                    Send Password Reset Email
+                  </s-button>
+                </resetPasswordFetcher.Form>
+              </s-stack>
+            </s-section>
           )}
 
           <s-section heading="Choose plan">
