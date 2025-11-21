@@ -24,6 +24,7 @@ const HOPRELAY_WEB_BASE_URL =
 const DEFAULT_COUNTRY = process.env.HOPRELAY_DEFAULT_COUNTRY || "US";
 const DEFAULT_TIMEZONE = process.env.HOPRELAY_DEFAULT_TIMEZONE || "America/New_York";
 const DEFAULT_LANGUAGE_ID = process.env.HOPRELAY_DEFAULT_LANGUAGE_ID || "1";
+const DEFAULT_ROLE_ID = process.env.HOPRELAY_DEFAULT_ROLE_ID || "2";
 
 // In-memory store for verification codes (in production, use Redis or database)
 const verificationCodes = new Map();
@@ -309,7 +310,7 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
   // User DOESN'T exist - create NEW account with auto-generated password
   console.log('[initializeHopRelayAccount] 🆕 New user - generating random password');
   
-  // Generate a secure random password
+  // Generate a secure random password (min 8 chars for HopRelay)
   const randomPassword = generateRandomPassword(20);
   generatedPassword = randomPassword;
   
@@ -317,6 +318,64 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
   try {
     console.log('[initializeHopRelayAccount] Creating new user with auto-generated password');
     
+    // Try admin API first if available (more reliable)
+    if (HOPRELAY_SYSTEM_TOKEN && HOPRELAY_SYSTEM_TOKEN !== 'your_hoprelay_system_token_here') {
+      try {
+        const form = new FormData();
+        form.set("token", HOPRELAY_SYSTEM_TOKEN);
+        form.set("name", name);
+        form.set("email", email);
+        form.set("password", randomPassword);
+        form.set("timezone", DEFAULT_TIMEZONE);
+        form.set("country", DEFAULT_COUNTRY);
+        form.set("language", DEFAULT_LANGUAGE_ID);
+        form.set("role", "2"); // Regular user role
+
+        const response = await fetch(`${HOPRELAY_ADMIN_BASE_URL}/create/user`, {
+          method: "POST",
+          body: form,
+        });
+
+        const json = await response.json();
+        console.log('[initializeHopRelayAccount] Admin API response:', json);
+        
+        if (json.status === 200 && json.data && json.data.id) {
+          console.log('[initializeHopRelayAccount] ✅ User created via admin API:', json.data.id);
+          isNewUser = true;
+          userId = json.data.id;
+          
+          // Send welcome email with auto-generated password
+          try {
+            await sendNewAccountEmail({
+              to: email,
+              password: randomPassword,
+              name: name,
+            });
+            console.log('[initializeHopRelayAccount] ✅ Welcome email with password sent to:', email);
+          } catch (emailError) {
+            console.error('[initializeHopRelayAccount] ❌ Failed to send welcome email:', emailError.message);
+            console.log('[initializeHopRelayAccount] 🔑 Generated password for', email + ':', randomPassword);
+          }
+          
+          // Send verification code
+          const codeResult = await sendVerificationCode({ email, name, userId, apiSecret });
+          
+          return {
+            success: true,
+            isNewUser: true,
+            userId,
+            verificationCodeSent: codeResult.success,
+            testCode: codeResult.code,
+            generatedPassword,
+            message: 'Account created! Check your email for password and verification code.',
+          };
+        }
+      } catch (adminError) {
+        console.log('[initializeHopRelayAccount] Admin API creation failed:', adminError.message);
+      }
+    }
+    
+    // Fallback to public registration
     const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
     const registerForm = new FormData();
     registerForm.set("name", name);
@@ -351,7 +410,7 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
       }
       
       // Wait for user to be created
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Try to get user ID from HopRelay
       const newUserCheck = await checkHopRelayUserExists(email);
