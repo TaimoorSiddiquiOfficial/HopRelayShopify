@@ -1377,8 +1377,19 @@ export default function Index() {
           )}
 
           <s-section heading="Choose plan">
+            {hoprelaySettings?.hoprelayPlanName && (
+              <s-text>
+                Current plan: <strong>{hoprelaySettings.hoprelayPlanName}</strong>
+              </s-text>
+            )}
             {hoprelayError && (
               <s-text variation="negative">{hoprelayError}</s-text>
+            )}
+            {createSubscriptionFetcher.data?.error && (
+              <s-text variation="negative">{createSubscriptionFetcher.data.error}</s-text>
+            )}
+            {createSubscriptionFetcher.data?.ok && (
+              <s-text variation="positive">Plan updated successfully!</s-text>
             )}
             <createSubscriptionFetcher.Form method="post">
               <input
@@ -1388,8 +1399,12 @@ export default function Index() {
               />
               <s-stack direction="block" gap="base">
                 <s-stack direction="inline" gap="base">
-                  {hoprelayPackages.map((pkg) => {
+                  {hoprelayPackages.map((pkg, index) => {
                     const inputId = `hoprelay-plan-${pkg.id}`;
+                    const isCurrentPlan = hoprelaySettings?.hoprelayPackageId === pkg.id;
+                    const isFirstPlan = index === 0;
+                    // Auto-select first plan for new accounts, or show current plan
+                    const shouldCheck = isCurrentPlan || (!hoprelaySettings?.hoprelayPackageId && isFirstPlan);
                     return (
                       <div key={pkg.id} style={{ display: "block" }}>
                         <input
@@ -1397,17 +1412,19 @@ export default function Index() {
                           type="radio"
                           name="packageId"
                           value={pkg.id}
-                          defaultChecked={
-                            hoprelaySettings?.hoprelayPackageId === pkg.id
-                          }
+                          defaultChecked={shouldCheck}
                         />
                         <label htmlFor={inputId} aria-label={pkg.name}>
                           <s-box
                             padding="base"
                             borderWidth="base"
                             borderRadius="base"
+                            background={isCurrentPlan ? "info-subdued" : undefined}
                           >
-                            <s-heading level="3">{pkg.name}</s-heading>
+                            <s-heading level="3">
+                              {pkg.name}
+                              {isCurrentPlan && " (Current)"}
+                            </s-heading>
                             <s-text>
                               ${pkg.price}/mo · {pkg.sms_send_limit} SMS/day ·{" "}
                               {pkg.device_limit} devices
@@ -1425,6 +1442,7 @@ export default function Index() {
                 </s-stack>
                 <s-button
                   type="submit"
+                  disabled={!isAccountConnected}
                   loading={
                     ["loading", "submitting"].includes(
                       createSubscriptionFetcher.state,
@@ -1432,9 +1450,14 @@ export default function Index() {
                   }
                 >
                   {hoprelaySettings?.hoprelayPackageId
-                    ? "Update subscription"
-                    : "Subscribe"}
+                    ? "Update Plan"
+                    : "Subscribe to Plan"}
                 </s-button>
+                {!isAccountConnected && (
+                  <s-text variation="subdued" size="small">
+                    Connect your HopRelay account first to choose a plan
+                  </s-text>
+                )}
               </s-stack>
             </createSubscriptionFetcher.Form>
           </s-section>
@@ -1442,7 +1465,12 @@ export default function Index() {
           <s-section heading="API key & permissions">
             {hoprelaySettings?.hoprelayApiKeyId ? (
               <s-stack direction="block" gap="base">
-                <s-text>API key connected for this shop.</s-text>
+                <s-text variation="positive">
+                  ✓ API key connected for this shop
+                  {hoprelaySettings.hoprelayApiKeyName && (
+                    <span> ({hoprelaySettings.hoprelayApiKeyName})</span>
+                  )}
+                </s-text>
                 {hoprelaySettings?.hoprelayApiSecret && (
                   <s-box
                     padding="base"
@@ -1450,12 +1478,17 @@ export default function Index() {
                     borderRadius="base"
                     background="subdued"
                   >
-                    <s-text>
-                      Your API secret (use in your Shopify integrations):
-                    </s-text>
-                    <pre style={{ margin: 0 }}>
-                      <code>{hoprelaySettings.hoprelayApiSecret}</code>
-                    </pre>
+                    <s-stack direction="block" gap="tight">
+                      <s-text>
+                        <strong>Your API Secret Key:</strong>
+                      </s-text>
+                      <pre style={{ margin: 0, wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                        <code>{hoprelaySettings.hoprelayApiSecret}</code>
+                      </pre>
+                      <s-text variation="subdued" size="small">
+                        Use this key for Shopify integrations and API calls. Keep it secure!
+                      </s-text>
+                    </s-stack>
                   </s-box>
                 )}
                 <revokeApiKeyFetcher.Form method="post">
@@ -1474,9 +1507,12 @@ export default function Index() {
                       )
                     }
                   >
-                    Revoke API key
+                    Revoke API Key
                   </s-button>
                 </revokeApiKeyFetcher.Form>
+                <s-text variation="subdued" size="small">
+                  ⚠️ Revoking will delete this API key from HopRelay and disconnect all integrations.
+                </s-text>
               </s-stack>
             ) : (
               <createApiKeyFetcher.Form method="post">
