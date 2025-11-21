@@ -550,13 +550,33 @@ export async function verifyHopRelayUserPassword({ email, password }) {
             console.log('[verifyHopRelayUserPassword] Password valid: redirected to dashboard');
             return true;
           } else {
-            console.log('[verifyHopRelayUserPassword] Password valid: session established (redirect to:', followLocation + ')');
-            return true;
+            console.log('[verifyHopRelayUserPassword] Password invalid: redirect target is not an authenticated page');
+            return false;
           }
         }
         
         // If 200 OK, we successfully landed on the homepage (success)
         if (followResponse.status === 200) {
+          // Inspect the resolved URL to make sure we actually landed on an authenticated page
+          try {
+            const resolved = new URL(followResponse.url || finalUrl);
+            const path = resolved.pathname || '/';
+            if (path === '/' || path === '' || path === '/home') {
+              console.log('[verifyHopRelayUserPassword] Landed on public homepage, treating as invalid login');
+              return false;
+            }
+            if (path.includes('/auth/login')) {
+              console.log('[verifyHopRelayUserPassword] Reached login page, treating as invalid login');
+              return false;
+            }
+            if (path.includes('/dashboard') || path.includes('/home')) {
+              console.log('[verifyHopRelayUserPassword] Resolved URL indicates dashboard/home, treating as valid login');
+              return true;
+            }
+          } catch (urlError) {
+            console.log('[verifyHopRelayUserPassword] Could not parse follow response URL:', urlError.message);
+          }
+
           const followText = await followResponse.text();
           console.log('[verifyHopRelayUserPassword] Page content length:', followText.length);
           console.log('[verifyHopRelayUserPassword] Page preview:', followText.substring(0, 500));
