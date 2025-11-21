@@ -190,6 +190,8 @@ export async function sendVerificationCode({ email, name, userId, apiSecret }) {
   let emailSent = false;
   
   try {
+    console.log('[sendVerificationCode] Attempting to send email via service:', process.env.EMAIL_SERVICE || 'console');
+    
     await sendVerificationEmail({
       to: email,
       code: code,
@@ -197,17 +199,18 @@ export async function sendVerificationCode({ email, name, userId, apiSecret }) {
     });
     
     emailSent = true;
-    console.log('[sendVerificationCode] Verification email sent successfully to:', email);
+    console.log('[sendVerificationCode] ✅ Verification email sent successfully to:', email);
   } catch (error) {
-    console.error('[sendVerificationCode] Failed to send email:', error.message);
+    console.error('[sendVerificationCode] ❌ Failed to send email:', error.message);
+    console.error('[sendVerificationCode] Full error:', error);
     // Continue anyway - code is still stored and can be used
-    console.log('[sendVerificationCode] Verification code for', email + ':', code);
+    console.log('[sendVerificationCode] 📧 Verification code for', email + ':', code);
   }
   
   return {
     success: true,
     code: code, // Keep this for testing - remove in production
-    message: `Verification code ${emailSent ? 'sent' : 'generated'} for ${email}`,
+    message: `Verification code ${emailSent ? 'sent to your email' : 'generated (check server logs)'}`,
     emailSent,
   };
 }

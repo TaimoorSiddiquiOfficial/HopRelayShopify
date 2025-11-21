@@ -102,15 +102,25 @@ async function sendViaSMTP({ to, subject, html, text }) {
   try {
     const nodemailer = await import('nodemailer');
     
-    const transporter = nodemailer.default.createTransport({
+    const smtpConfig = {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465', // true for 465, false for other ports
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+    };
+    
+    console.log('[sendViaSMTP] SMTP Config:', {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure,
+      user: smtpConfig.auth.user,
+      hasPassword: !!smtpConfig.auth.pass,
     });
+    
+    const transporter = nodemailer.default.createTransport(smtpConfig);
 
     const info = await transporter.sendMail({
       from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
@@ -120,11 +130,12 @@ async function sendViaSMTP({ to, subject, html, text }) {
       html,
     });
 
-    console.log('[sendViaSMTP] Message sent:', info.messageId);
+    console.log('[sendViaSMTP] Message sent successfully:', info.messageId);
     return { success: true, method: 'smtp', messageId: info.messageId };
   } catch (error) {
-    console.error('[sendViaSMTP] Failed to load nodemailer. Install with: npm install nodemailer');
-    throw new Error('SMTP email service not configured. Please install nodemailer or use a different email service.');
+    console.error('[sendViaSMTP] Failed to send email:', error.message);
+    console.error('[sendViaSMTP] Error details:', error);
+    throw new Error(`SMTP email failed: ${error.message}`);
   }
 }
 
