@@ -180,7 +180,6 @@ export const action = async ({ request }) => {
           type: "initialize-hoprelay-account",
           isNewUser: result.isNewUser,
           email: email,
-          testCode: result.testCode, // Remove in production
           generatedPassword: result.generatedPassword,
           message: result.message,
         };
@@ -1289,11 +1288,6 @@ export default function Index() {
                     {createAccountFetcher.data?.message && (
                       <s-box padding="base" borderWidth="base" borderRadius="base" background="success-subdued">
                         <s-text>{createAccountFetcher.data.message}</s-text>
-                        {createAccountFetcher.data?.testCode && (
-                          <s-text size="small">
-                            <strong>Test Code (Development Only):</strong> {createAccountFetcher.data.testCode}
-                          </s-text>
-                        )}
                       </s-box>
                     )}
                     
