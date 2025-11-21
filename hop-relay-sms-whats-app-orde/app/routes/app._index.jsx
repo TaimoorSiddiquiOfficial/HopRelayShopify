@@ -21,6 +21,8 @@ import {
   sendHopRelayWhatsappBulk,
   sendHopRelayPasswordReset,
   verifyHopRelayUserPassword,
+  initializeHopRelayAccount,
+  verifyCode,
 } from "../hoprelay.server";
 
 export const loader = async ({ request }) => {
@@ -149,6 +151,116 @@ export const action = async ({ request }) => {
   const intent = formData.get("_action");
 
   switch (intent) {
+    case "initialize-hoprelay-account": {
+      const name = formData.get("name") || "";
+      const email = formData.get("email") || "";
+      const password = formData.get("password") || "";
+
+      if (!email) {
+        return {
+          ok: false,
+          type: "initialize-hoprelay-account",
+          error: "Email address is required.",
+        };
+      }
+
+      try {
+        // Get API secret if available to send emails
+        const settings = await prisma.hopRelaySettings.findUnique({
+          where: { shop: session.shop },
+        });
+        
+        const result = await initializeHopRelayAccount({ 
+          email, 
+          name: name || email.split('@')[0],
+          password: password || null,
+          apiSecret: settings?.hoprelayApiSecret || null,
+        });
+
+        // If password is required for new account creation
+        if (!result.success && result.requiresPassword) {
+          return {
+            ok: false,
+            type: "initialize-hoprelay-account",
+            requiresPassword: true,
+            email: email,
+            name: name,
+            message: result.message,
+          };
+        }
+
+        return {
+          ok: true,
+          type: "initialize-hoprelay-account",
+          isNewUser: result.isNewUser,
+          email: email,
+          testCode: result.testCode, // Remove in production
+          generatedPassword: result.generatedPassword,
+          message: result.message,
+        };
+      } catch (error) {
+        console.error("Failed to initialize HopRelay account:", error);
+        return {
+          ok: false,
+          type: "initialize-hoprelay-account",
+          error: error.message || "Unable to initialize account. Please try again.",
+        };
+      }
+    }
+
+    case "verify-hoprelay-code": {
+      const email = formData.get("email") || "";
+      const code = formData.get("code") || "";
+
+      if (!email || !code) {
+        return {
+          ok: false,
+          type: "verify-hoprelay-code",
+          error: "Email and verification code are required.",
+        };
+      }
+
+      try {
+        const result = await verifyCode({ email, code });
+
+        if (!result.success) {
+          return {
+            ok: false,
+            type: "verify-hoprelay-code",
+            error: result.message,
+          };
+        }
+
+        // Save to database
+        const settings = await prisma.hopRelaySettings.upsert({
+          where: { shop: session.shop },
+          update: {
+            hoprelayUserId: result.userId || 999999,
+            hoprelayUserEmail: email,
+          },
+          create: {
+            shop: session.shop,
+            hoprelayUserId: result.userId || 999999,
+            hoprelayUserEmail: email,
+          },
+        });
+
+        return {
+          ok: true,
+          type: "verify-hoprelay-code",
+          hoprelayUserId: settings.hoprelayUserId,
+          message: "Account connected successfully!",
+        };
+      } catch (error) {
+        console.error("Failed to verify code:", error);
+        return {
+          ok: false,
+          type: "verify-hoprelay-code",
+          error: error.message || "Verification failed. Please try again.",
+        };
+      }
+    }
+
     case "create-hoprelay-account": {
       const name = formData.get("name") || "";
       const email = formData.get("email") || "";
@@ -172,15 +284,6 @@ export const action = async ({ request }) => {
           existing = await findHopRelayUserByEmail(email);
         } catch (lookupError) {
           console.error("[create-hoprelay-account] Failed to lookup user:", lookupError);
-          if (lookupError?.code === "ADMIN_TOKEN_INVALID") {
-            return {
-              ok: false,
-              type: "create-hoprelay-account",
-              error:
-                "Your HopRelay Admin API token is invalid or missing. Please update HOPRELAY_SYSTEM_TOKEN in your environment variables and try again.",
-              needsAdminToken: true,
-            };
-          }
         }
 
         // ALWAYS verify password to prevent hijacking existing accounts
@@ -1093,7 +1196,173 @@ export default function Index() {
           </s-section>
           {!isAccountConnected && (
             <>
-              <s-heading level="3">Create or Connect HopRelay Account</s-heading>
+              <s-heading level="3">Connect HopRelay Account (Simplified)</s-heading>
+              <s-text variation="subdued" size="small">
+                We've simplified the connection process. Just enter your email and we'll send you a verification code.
+              </s-text>
+              
+              {/* Step 1: Enter Email */}
+              {!createAccountFetcher.data?.email && (
+                <createAccountFetcher.Form method="post">
+                  <input
+                    type="hidden"
+                    name="_action"
+                    value="initialize-hoprelay-account"
+                  />
+                  <s-stack direction="block" gap="base">
+                    {createAccountFetcher.data?.error && (
+                      <s-text variation="negative">{createAccountFetcher.data.error}</s-text>
+                    )}
+                    
+                    {createAccountFetcher.data?.message && (
+                      <s-box padding="base" borderWidth="base" borderRadius="base" background="info-subdued">
+                        <s-text>{createAccountFetcher.data.message}</s-text>
+                      </s-box>
+                    )}
+                    
+                    <s-text-field
+                      label="Email Address"
+                      name="email"
+                      type="email"
+                      defaultValue={createAccountFetcher.data?.email || shop.email}
+                      placeholder="your@email.com"
+                      required
+                    />
+                    
+                    <s-text-field
+                      label="Name (optional)"
+                      name="name"
+                      defaultValue={createAccountFetcher.data?.name || shop.name}
+                      placeholder="Your name"
+                    />
+                    
+                    {/* Show password field only if account doesn't exist */}
+                    {createAccountFetcher.data?.requiresPassword && (
+                      <>
+                        <s-text-field
+                          label="Password"
+                          name="password"
+                          type="password"
+                          placeholder="Create a password for HopRelay dashboard access"
+                          required
+                        />
+                        <s-text variation="subdued" size="small">
+                          <strong>Note:</strong> This password is for accessing HopRelay.com dashboard directly for more features.
+                          Save it securely - you'll need it to login to HopRelay.com.
+                        </s-text>
+                      </>
+                    )}
+                    
+                    <s-button
+                      type="submit"
+                      loading={
+                        ["loading", "submitting"].includes(
+                          createAccountFetcher.state,
+                        )
+                      }
+                    >
+                      {createAccountFetcher.data?.requiresPassword 
+                        ? "Create Account & Send Verification Code" 
+                        : "Send Verification Code"}
+                    </s-button>
+                    
+                    {!createAccountFetcher.data?.requiresPassword && (
+                      <s-text variation="subdued" size="small">
+                        • If you have an account, we'll send you a verification code<br/>
+                        • If you don't have an account, we'll ask for a password to create one
+                      </s-text>
+                    )}
+                  </s-stack>
+                </createAccountFetcher.Form>
+              )}
+              
+              {/* Step 2: Enter Verification Code */}
+              {createAccountFetcher.data?.email && !createAccountFetcher.data?.hoprelayUserId && (
+                <createAccountFetcher.Form method="post">
+                  <input
+                    type="hidden"
+                    name="_action"
+                    value="verify-hoprelay-code"
+                  />
+                  <input
+                    type="hidden"
+                    name="email"
+                    value={createAccountFetcher.data.email}
+                  />
+                  <s-stack direction="block" gap="base">
+                    {createAccountFetcher.data?.message && (
+                      <s-box padding="base" borderWidth="base" borderRadius="base" background="success-subdued">
+                        <s-text>{createAccountFetcher.data.message}</s-text>
+                        {createAccountFetcher.data?.testCode && (
+                          <s-text size="small">
+                            <strong>Test Code (Development Only):</strong> {createAccountFetcher.data.testCode}
+                          </s-text>
+                        )}
+                      </s-box>
+                    )}
+                    
+                    {/* Show generated password for new accounts */}
+                    {createAccountFetcher.data?.generatedPassword && (
+                      <s-box padding="base" borderWidth="base" borderRadius="base" background="info-subdued">
+                        <s-stack direction="block" gap="tight">
+                          <s-text>
+                            <strong>Your HopRelay Dashboard Password:</strong>
+                          </s-text>
+                          <s-text-field
+                            label="Password (Save this!)"
+                            value={createAccountFetcher.data.generatedPassword}
+                            readOnly
+                            helpText="Use this password to login directly to HopRelay.com for advanced features"
+                          />
+                          <s-text variation="subdued" size="small">
+                            ⚠️ Save this password securely! You'll need it to access your HopRelay dashboard at hoprelay.com
+                          </s-text>
+                        </s-stack>
+                      </s-box>
+                    )}
+                    
+                    {createAccountFetcher.data?.error && (
+                      <s-text variation="negative">{createAccountFetcher.data.error}</s-text>
+                    )}
+                    
+                    <s-text>
+                      Verification code sent to: <strong>{createAccountFetcher.data.email}</strong>
+                    </s-text>
+                    
+                    <s-text-field
+                      label="Verification Code"
+                      name="code"
+                      type="text"
+                      placeholder="Enter 6-digit code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      required
+                    />
+                    
+                    <s-button
+                      type="submit"
+                      loading={
+                        ["loading", "submitting"].includes(
+                          createAccountFetcher.state,
+                        )
+                      }
+                    >
+                      Verify & Connect
+                    </s-button>
+                    
+                    <s-button
+                      variant="tertiary"
+                      onClick={() => window.location.reload()}
+                    >
+                      Use Different Email
+                    </s-button>
+                  </s-stack>
+                </createAccountFetcher.Form>
+              )}
+              
+              <s-divider />
+              
+              <s-heading level="3">Or Use Password (Legacy Method)</s-heading>
               <createAccountFetcher.Form method="post">
                 <input
                   type="hidden"
