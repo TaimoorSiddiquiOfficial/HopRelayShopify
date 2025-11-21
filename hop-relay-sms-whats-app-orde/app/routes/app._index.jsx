@@ -236,12 +236,12 @@ export const action = async ({ request }) => {
         const settings = await prisma.hopRelaySettings.upsert({
           where: { shop: session.shop },
           update: {
-            hoprelayUserId: result.userId || 999999,
+            hoprelayUserId: result.userId ? parseInt(result.userId, 10) : 999999,
             hoprelayUserEmail: email,
           },
           create: {
             shop: session.shop,
-            hoprelayUserId: result.userId || 999999,
+            hoprelayUserId: result.userId ? parseInt(result.userId, 10) : 999999,
             hoprelayUserEmail: email,
           },
         });
