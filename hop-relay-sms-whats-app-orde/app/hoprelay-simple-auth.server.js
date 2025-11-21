@@ -284,28 +284,22 @@ export async function initializeHopRelayAccount({ email, name, password, apiSecr
     };
   }
   
-  // User doesn't exist or we can't determine - check if password was provided
-  if (!password) {
-    // User needs to provide a password to create account
-    console.log('[initializeHopRelayAccount] New user - password required');
-    return {
-      success: false,
-      isNewUser: true,
-      requiresPassword: true,
-      message: 'Account not found. Please provide a password to create your HopRelay account.',
-    };
-  }
+  // User doesn't exist or we can't determine - create account with random password
+  console.log('[initializeHopRelayAccount] New user - generating random password');
   
-  // Create new user with provided password
+  // Generate a secure random password
+  const randomPassword = generateRandomPassword(20);
+  generatedPassword = randomPassword;
+  
+  // Create new user with auto-generated password
   try {
-    console.log('[initializeHopRelayAccount] Creating new user with provided password');
+    console.log('[initializeHopRelayAccount] Creating new user with auto-generated password');
     
-    // Use the provided password instead of random
     const baseUrl = HOPRELAY_ADMIN_BASE_URL.replace(/\/admin\/?$/, "");
     const registerForm = new FormData();
     registerForm.set("name", name);
     registerForm.set("email", email);
-    registerForm.set("password", password);
+    registerForm.set("password", randomPassword);
     registerForm.set("terms", "1");
     
     const registerResponse = await fetch(`${baseUrl}/auth/register`, {
@@ -317,33 +311,33 @@ export async function initializeHopRelayAccount({ email, name, password, apiSecr
     console.log('[initializeHopRelayAccount] Registration status:', registerResponse.status);
     
     if (registerResponse.status === 302 || registerResponse.status === 200) {
-      console.log('[initializeHopRelayAccount] User created successfully');
+      console.log('[initializeHopRelayAccount] User created successfully with random password');
       isNewUser = true;
-      generatedPassword = password;
       
-      // Send welcome email with credentials
+      // Send welcome email with auto-generated password
       try {
         await sendNewAccountEmail({
           to: email,
-          password: password,
+          password: randomPassword,
           name: name,
         });
-        console.log('[initializeHopRelayAccount] Welcome email sent to:', email);
+        console.log('[initializeHopRelayAccount] ✅ Welcome email with password sent to:', email);
       } catch (emailError) {
-        console.error('[initializeHopRelayAccount] Failed to send welcome email:', emailError.message);
-        // Continue anyway
+        console.error('[initializeHopRelayAccount] ❌ Failed to send welcome email:', emailError.message);
+        console.log('[initializeHopRelayAccount] 🔑 Generated password for', email + ':', randomPassword);
+        // Continue anyway - password will be shown in UI
       }
       
       // Wait for user to be created
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Try to get user ID
-      const userCheck = await checkHopRelayUserExists(email);
-      if (userCheck.userId) {
-        userId = userCheck.userId;
+      const newUserCheck = await checkHopRelayUserExists(email);
+      if (newUserCheck.userId) {
+        userId = newUserCheck.userId;
       }
     } else {
-      throw new Error('Failed to create account. Please try a different password.');
+      throw new Error('Failed to create account. Please try again later.');
     }
   } catch (error) {
     console.log('[initializeHopRelayAccount] Could not create user:', error.message);
