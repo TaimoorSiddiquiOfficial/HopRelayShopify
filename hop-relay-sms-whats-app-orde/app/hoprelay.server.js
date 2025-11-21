@@ -471,17 +471,40 @@ export async function verifyHopRelayUserPassword({ email, password }) {
     
     // Successful login redirects to dashboard, failed login redirects back to /auth/login with error
     if (loginResponse.status === 302) {
-      // Check if redirect is to dashboard (success) or back to login (failure)
-      if (location && (location.includes('/dashboard') || location.includes('/home') || location === '/')) {
-        // Extract session cookie to double-verify
-        const cookies = loginResponse.headers.get('set-cookie');
-        if (cookies && cookies.includes('PHPSESSID=')) {
-          console.log('[verifyHopRelayUserPassword] Password valid: true (successful login to dashboard)');
-          return true;
+      // Normalize the location URL to handle protocol-relative URLs
+      let normalizedLocation = location;
+      if (location && location.startsWith('//')) {
+        normalizedLocation = 'https:' + location;
+      }
+      
+      // Check if redirect is to dashboard/home (success) or back to login (failure)
+      if (location) {
+        // Success patterns: dashboard, home, root path, or hoprelay.com homepage
+        const isSuccessRedirect = 
+          location.includes('/dashboard') || 
+          location.includes('/home') || 
+          location === '/' ||
+          location === '//hoprelay.com' ||
+          location === 'https://hoprelay.com' ||
+          location === 'http://hoprelay.com';
+        
+        // Failure patterns: back to login page or error parameter
+        const isFailureRedirect = 
+          location.includes('/auth/login') || 
+          location.includes('error=') ||
+          location.includes('?error');
+        
+        if (isSuccessRedirect && !isFailureRedirect) {
+          // Verify session cookie is present
+          const cookies = loginResponse.headers.get('set-cookie');
+          if (cookies && cookies.includes('PHPSESSID=')) {
+            console.log('[verifyHopRelayUserPassword] Password valid: true (successful login - redirect to:', location + ')');
+            return true;
+          }
+        } else if (isFailureRedirect) {
+          console.log('[verifyHopRelayUserPassword] Password invalid: redirected back to login with error');
+          return false;
         }
-      } else if (location && (location.includes('/auth/login') || location.includes('error'))) {
-        console.log('[verifyHopRelayUserPassword] Password invalid: redirected back to login with error');
-        return false;
       }
     }
     
