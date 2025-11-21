@@ -234,7 +234,6 @@ export async function sendVerificationCode({ email, name, userId, apiSecret }) {
   
   return {
     success: true,
-    code: code, // Keep this for testing - remove in production
     message: `Verification code ${emailSent ? 'sent to your email' : 'generated (check server logs)'}`,
     emailSent,
   };
@@ -302,7 +301,6 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
       isNewUser: false,
       userId,
       verificationCodeSent: codeResult.success,
-      testCode: codeResult.code, // Keep for testing
       message: 'Verification code sent to your email.',
     };
   }
@@ -365,7 +363,6 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
             isNewUser: true,
             userId,
             verificationCodeSent: codeResult.success,
-            testCode: codeResult.code,
             generatedPassword,
             message: 'Account created! Check your email for password and verification code.',
           };
@@ -436,7 +433,6 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
     isNewUser: true,
     userId,
     verificationCodeSent: codeResult.success,
-    testCode: codeResult.code, // Keep for testing
     generatedPassword,
     message: 'Account created! Check your email for password and verification code.',
   };
