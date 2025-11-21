@@ -172,6 +172,15 @@ export const action = async ({ request }) => {
           existing = await findHopRelayUserByEmail(email);
         } catch (lookupError) {
           console.error("[create-hoprelay-account] Failed to lookup user:", lookupError);
+          if (lookupError?.code === "ADMIN_TOKEN_INVALID") {
+            return {
+              ok: false,
+              type: "create-hoprelay-account",
+              error:
+                "Your HopRelay Admin API token is invalid or missing. Please update HOPRELAY_SYSTEM_TOKEN in your environment variables and try again.",
+              needsAdminToken: true,
+            };
+          }
         }
 
         // ALWAYS verify password to prevent hijacking existing accounts
