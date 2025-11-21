@@ -154,7 +154,6 @@ export const action = async ({ request }) => {
     case "initialize-hoprelay-account": {
       const name = formData.get("name") || "";
       const email = formData.get("email") || "";
-      const password = formData.get("password") || "";
 
       if (!email) {
         return {
@@ -173,21 +172,8 @@ export const action = async ({ request }) => {
         const result = await initializeHopRelayAccount({ 
           email, 
           name: name || email.split('@')[0],
-          password: password || null,
           apiSecret: settings?.hoprelayApiSecret || null,
         });
-
-        // If password is required for new account creation
-        if (!result.success && result.requiresPassword) {
-          return {
-            ok: false,
-            type: "initialize-hoprelay-account",
-            requiresPassword: true,
-            email: email,
-            name: name,
-            message: result.message,
-          };
-        }
 
         return {
           ok: true,
@@ -1198,7 +1184,7 @@ export default function Index() {
             <>
               <s-heading level="3">Connect HopRelay Account (Simplified)</s-heading>
               <s-text variation="subdued" size="small">
-                We've simplified the connection process. Just enter your email and we'll send you a verification code.
+                Simply enter your email address. We'll automatically create an account if needed and send you a verification code.
               </s-text>
               
               {/* Step 1: Enter Email */}
@@ -1236,23 +1222,6 @@ export default function Index() {
                       placeholder="Your name"
                     />
                     
-                    {/* Show password field only if account doesn't exist */}
-                    {createAccountFetcher.data?.requiresPassword && (
-                      <>
-                        <s-text-field
-                          label="Password"
-                          name="password"
-                          type="password"
-                          placeholder="Create a password for HopRelay dashboard access"
-                          required
-                        />
-                        <s-text variation="subdued" size="small">
-                          <strong>Note:</strong> This password is for accessing HopRelay.com dashboard directly for more features.
-                          Save it securely - you'll need it to login to HopRelay.com.
-                        </s-text>
-                      </>
-                    )}
-                    
                     <s-button
                       type="submit"
                       loading={
@@ -1261,17 +1230,13 @@ export default function Index() {
                         )
                       }
                     >
-                      {createAccountFetcher.data?.requiresPassword 
-                        ? "Create Account & Send Verification Code" 
-                        : "Send Verification Code"}
+                      Send Verification Code
                     </s-button>
                     
-                    {!createAccountFetcher.data?.requiresPassword && (
-                      <s-text variation="subdued" size="small">
-                        • If you have an account, we'll send you a verification code<br/>
-                        • If you don't have an account, we'll ask for a password to create one
-                      </s-text>
-                    )}
+                    <s-text variation="subdued" size="small">
+                      • Existing users: Receive verification code instantly<br/>
+                      • New users: We'll create your account and email your password
+                    </s-text>
                   </s-stack>
                 </createAccountFetcher.Form>
               )}
