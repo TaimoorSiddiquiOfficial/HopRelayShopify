@@ -572,12 +572,9 @@ export async function verifyHopRelayUserPassword({ email, password }) {
             console.log('[verifyHopRelayUserPassword] Password valid: page contains logout functionality');
             return true;
           } else {
-            // If we can't determine, assume success if we have a valid session cookie
-            console.log('[verifyHopRelayUserPassword] Cannot determine from page content, checking session');
-            if (cookieHeader) {
-              console.log('[verifyHopRelayUserPassword] Password valid: has session cookie and reached homepage');
-              return true;
-            }
+            // If we can't determine, treat as failure to avoid false positives
+            console.log('[verifyHopRelayUserPassword] Could not confirm login success from page content');
+            return false;
           }
         }
       } catch (followError) {
