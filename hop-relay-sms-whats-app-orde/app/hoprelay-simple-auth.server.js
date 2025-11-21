@@ -352,6 +352,19 @@ export async function initializeHopRelayAccount({ email, name, apiSecret }) {
         const json = await response.json();
         console.log('[initializeHopRelayAccount] Admin API full response:', JSON.stringify(json, null, 2));
         
+        // Log the exact response for debugging
+        if (json.status === 400) {
+          console.log('[initializeHopRelayAccount] ⚠️ 400 Error - Parameters sent:');
+          console.log('  - name:', name, '(length:', name?.length, ')');
+          console.log('  - email:', email, '(valid email:', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), ')');
+          console.log('  - password length:', randomPassword.length);
+          console.log('  - timezone:', DEFAULT_TIMEZONE);
+          console.log('  - country:', DEFAULT_COUNTRY);
+          console.log('  - language:', DEFAULT_LANGUAGE_ID, '(type:', typeof DEFAULT_LANGUAGE_ID, ')');
+          console.log('  - role:', DEFAULT_ROLE_ID, '(type:', typeof DEFAULT_ROLE_ID, ')');
+          console.log('  - theme:', 'light');
+        }
+        
         if (json.status === 200 && json.data && json.data.id) {
           console.log('[initializeHopRelayAccount] ✅ User created via admin API:', json.data.id);
           isNewUser = true;
