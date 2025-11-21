@@ -252,7 +252,28 @@ export async function findHopRelayUserByEmail(email) {
       method: "GET",
     });
 
-    const json = await parseJsonResponse(response);
+    let json;
+    try {
+      json = await parseJsonResponse(response);
+    } catch (error) {
+      const message = (error?.message || "").toLowerCase();
+      const detailMessage = (error?.details?.message || "").toLowerCase();
+      const status = error?.details?.status;
+
+      // If the system token is invalid, stop trying to query the admin API
+      if (
+        status === 401 ||
+        status === 403 ||
+        message.includes("invalid system token") ||
+        detailMessage.includes("invalid system token")
+      ) {
+        console.log("[findHopRelayUserByEmail] Admin API rejected system token, skipping lookup");
+        return null;
+      }
+
+      console.log(`[findHopRelayUserByEmail] Failed to fetch page ${page}:`, error.message);
+      return null;
+    }
     const users = json.data || [];
     
     console.log(`[findHopRelayUserByEmail] Page ${page}: Found ${users.length} users`);
