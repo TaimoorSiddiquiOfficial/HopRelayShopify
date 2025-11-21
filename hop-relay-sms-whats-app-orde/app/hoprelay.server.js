@@ -579,6 +579,39 @@ export async function verifyHopRelayUserPassword({ email, password }) {
         
         // If 200 OK, we successfully landed on the homepage (success)
         if (followResponse.status === 200) {
+          // Probe a protected page to confirm the session is actually authenticated
+          if (cookieHeader) {
+            try {
+              const dashboardResponse = await fetch(`${baseUrl}/dashboard`, {
+                method: 'GET',
+                headers: { Cookie: cookieHeader },
+                redirect: 'manual',
+              });
+              
+              const dashLocation = dashboardResponse.headers.get('location');
+              console.log('[verifyHopRelayUserPassword] Dashboard probe status:', dashboardResponse.status);
+              console.log('[verifyHopRelayUserPassword] Dashboard probe redirect location:', dashLocation);
+
+              if (dashboardResponse.status === 302 && dashLocation?.includes('/auth/login')) {
+                console.log('[verifyHopRelayUserPassword] Dashboard probe redirected to login, treating as invalid');
+                return false;
+              }
+
+              if (dashboardResponse.status === 200) {
+                const dashText = await dashboardResponse.text();
+                if (
+                  !dashText.includes('name="password"') &&
+                  !dashText.includes('name="email"')
+                ) {
+                  console.log('[verifyHopRelayUserPassword] Dashboard accessible with session cookie, treating as valid login');
+                  return true;
+                }
+              }
+            } catch (dashboardError) {
+              console.log('[verifyHopRelayUserPassword] Dashboard probe failed:', dashboardError.message);
+            }
+          }
+
           // Inspect the resolved URL to make sure we actually landed on an authenticated page
           try {
             const resolved = new URL(followResponse.url || finalUrl);
