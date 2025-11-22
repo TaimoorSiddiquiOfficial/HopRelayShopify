@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -1037,7 +1037,6 @@ export default function Index() {
 
   const shopify = useAppBridge();
   const [activeTab, setActiveTab] = useState("account");
-  const ssoWindowRef = useRef(null);
   const isAccountConnected =
     !!hoprelaySettings?.hoprelayUserId &&
     !!hoprelaySettings?.hoprelayUserEmail;
@@ -1067,22 +1066,10 @@ export default function Index() {
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
-        console.log('[SSO] Received SSO URL:', data.url);
-        console.log('[SSO] Window ref exists:', !!ssoWindowRef.current);
-        console.log('[SSO] Window closed:', ssoWindowRef.current?.closed);
-        
-        // Navigate the window that was opened synchronously in the click handler
-        if (ssoWindowRef.current && !ssoWindowRef.current.closed) {
-          console.log('[SSO] Navigating existing window to:', data.url);
-          ssoWindowRef.current.location.href = data.url;
-          ssoWindowRef.current = null;
-        } else {
-          console.log('[SSO] Window not available, opening new window');
-          // Fallback: try to open directly (may be blocked)
-          const newWindow = window.open(data.url, "_blank", "noopener,noreferrer");
-          if (!newWindow) {
-            shopify.toast.show("Popup blocked. Please allow popups for this site.");
-          }
+        // Open the SSO URL directly in a new window
+        const newWindow = window.open(data.url, "_blank", "noopener,noreferrer");
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          shopify.toast.show("Popup blocked. Please allow popups for this site and try again.");
         }
       } else if (data?.type === "reset-password") {
         shopify.toast.show(`Password reset email sent to ${data.email}`);
@@ -1612,8 +1599,6 @@ export default function Index() {
             <s-stack direction="inline" gap="base">
               <s-button
                 onClick={() => {
-                  // Open window synchronously during user interaction to avoid popup blockers
-                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard" },
                     { method: "POST" }
@@ -1625,8 +1610,6 @@ export default function Index() {
               </s-button>
               <s-button
                 onClick={() => {
-                  // Open window synchronously during user interaction to avoid popup blockers
-                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard/hosts/android" },
                     { method: "POST" }
@@ -1639,8 +1622,6 @@ export default function Index() {
               </s-button>
               <s-button
                 onClick={() => {
-                  // Open window synchronously during user interaction to avoid popup blockers
-                  ssoWindowRef.current = window.open("", "_blank", "noopener,noreferrer");
                   ssoFetcher.submit(
                     { _action: "generate-sso-link", redirect: "dashboard/hosts/whatsapp" },
                     { method: "POST" }
