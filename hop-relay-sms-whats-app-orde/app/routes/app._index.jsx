@@ -1067,13 +1067,22 @@ export default function Index() {
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
+        console.log('[SSO] Received SSO URL:', data.url);
+        console.log('[SSO] Window ref exists:', !!ssoWindowRef.current);
+        console.log('[SSO] Window closed:', ssoWindowRef.current?.closed);
+        
         // Navigate the window that was opened synchronously in the click handler
         if (ssoWindowRef.current && !ssoWindowRef.current.closed) {
-          ssoWindowRef.current.location = data.url;
+          console.log('[SSO] Navigating existing window to:', data.url);
+          ssoWindowRef.current.location.href = data.url;
           ssoWindowRef.current = null;
         } else {
+          console.log('[SSO] Window not available, opening new window');
           // Fallback: try to open directly (may be blocked)
-          window.open(data.url, "_blank", "noopener,noreferrer");
+          const newWindow = window.open(data.url, "_blank", "noopener,noreferrer");
+          if (!newWindow) {
+            shopify.toast.show("Popup blocked. Please allow popups for this site.");
+          }
         }
       } else if (data?.type === "reset-password") {
         shopify.toast.show(`Password reset email sent to ${data.email}`);
