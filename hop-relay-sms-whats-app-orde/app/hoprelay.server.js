@@ -944,10 +944,12 @@ export async function sendHopRelayWhatsappBulk({
 }
 
 export async function getHopRelayApiKeys({ userId }) {
-  ensureSystemToken();
+  if (!HOPRELAY_ADMIN_API_TOKEN) {
+    throw new Error("Missing HOPRELAY_ADMIN_API_TOKEN environment variable.");
+  }
 
   const url = new URL(`${HOPRELAY_ADMIN_BASE_URL}/get/apikeys`);
-  url.searchParams.set("token", HOPRELAY_SYSTEM_TOKEN);
+  url.searchParams.set("token", HOPRELAY_ADMIN_API_TOKEN);
   url.searchParams.set("user", String(userId));
   url.searchParams.set("limit", "100");
 
@@ -960,10 +962,12 @@ export async function getHopRelayApiKeys({ userId }) {
 }
 
 export async function deleteHopRelayApiKey({ id }) {
-  ensureSystemToken();
+  if (!HOPRELAY_ADMIN_API_TOKEN) {
+    throw new Error("Missing HOPRELAY_ADMIN_API_TOKEN environment variable.");
+  }
 
   const form = new FormData();
-  form.set("token", HOPRELAY_SYSTEM_TOKEN);
+  form.set("token", HOPRELAY_ADMIN_API_TOKEN);
   form.set("id", String(id));
 
   const response = await fetch(
@@ -978,8 +982,6 @@ export async function deleteHopRelayApiKey({ id }) {
 }
 
 export async function deleteAllHopRelayApiKeys({ userId }) {
-  ensureSystemToken();
-
   try {
     const apiKeys = await getHopRelayApiKeys({ userId });
     

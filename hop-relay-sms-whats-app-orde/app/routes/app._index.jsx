@@ -797,6 +797,27 @@ export const action = async ({ request }) => {
           };
         }
 
+        // Delete ALL API keys for this user from HopRelay backend before disconnecting
+        if (existing.hoprelayUserId) {
+          try {
+            const apiKeys = await getHopRelayApiKeys({ userId: existing.hoprelayUserId });
+            
+            if (apiKeys && apiKeys.length > 0) {
+              const deletePromises = apiKeys.map((apiKey) =>
+                deleteHopRelayApiKey({ id: apiKey.id }).catch((error) => {
+                  console.error(`Failed to delete API key ${apiKey.id}:`, error);
+                  return null;
+                })
+              );
+              await Promise.all(deletePromises);
+              console.log(`Deleted ${apiKeys.length} API key(s) for user ${existing.hoprelayUserId} during account disconnect`);
+            }
+          } catch (error) {
+            console.error("Failed to delete API keys from HopRelay during disconnect:", error);
+            // Continue to disconnect even if remote delete fails
+          }
+        }
+
         await prisma.hopRelaySettings.update({
           where: { shop: session.shop },
           data: {
