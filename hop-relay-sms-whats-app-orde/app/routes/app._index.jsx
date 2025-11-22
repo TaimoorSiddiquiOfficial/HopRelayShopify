@@ -1066,10 +1066,20 @@ export default function Index() {
 
     if (data?.ok) {
       if (data?.type === "generate-sso-link" && data?.url) {
-        // Open the SSO URL directly in a new window
-        const newWindow = window.open(data.url, "_blank", "noopener,noreferrer");
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          shopify.toast.show("Popup blocked. Please allow popups for this site and try again.");
+        // Use App Bridge to open external URL in new tab
+        // This works better in embedded Shopify apps than window.open()
+        try {
+          // Create a temporary link and click it to open in new tab
+          const link = document.createElement('a');
+          link.href = data.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (error) {
+          console.error('Failed to open SSO link:', error);
+          shopify.toast.show("Failed to open SSO link. Please try again.");
         }
       } else if (data?.type === "reset-password") {
         shopify.toast.show(`Password reset email sent to ${data.email}`);
