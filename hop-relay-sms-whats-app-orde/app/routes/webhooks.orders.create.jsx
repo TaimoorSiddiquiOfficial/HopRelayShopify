@@ -3,10 +3,9 @@ import prisma from "../db.server";
 import {
   sendHopRelaySms,
   sendHopRelayWhatsapp,
-  saveHopRelayContact,
+  createHopRelayContact,
   getHopRelayGroups,
   createHopRelayGroup,
-  addContactToHopRelayGroup,
 } from "../hoprelay.server";
 
 function extractPhone(order) {
@@ -68,14 +67,6 @@ export const action = async ({ request }) => {
 
     // Save contact to HopRelay and add to "Customers" group
     try {
-      // Save contact
-      await saveHopRelayContact({
-        secret: settings.hoprelayApiSecret,
-        name: customerName || phone,
-        phone: phone,
-      });
-      console.log(`Contact saved: ${customerName} (${phone})`);
-
       // Get or create "Customers" group
       const groups = await getHopRelayGroups({ secret: settings.hoprelayApiSecret });
       let customersGroup = groups.find(g => g.name === "Customers");
@@ -85,18 +76,21 @@ export const action = async ({ request }) => {
           secret: settings.hoprelayApiSecret,
           name: "Customers",
         });
-        customersGroup = result.data;
+        // Re-fetch groups to get the new group ID
+        const updatedGroups = await getHopRelayGroups({ secret: settings.hoprelayApiSecret });
+        customersGroup = updatedGroups.find(g => g.name === "Customers");
         console.log('Created "Customers" group');
       }
 
-      // Add contact to "Customers" group
+      // Create contact with group ID
       if (customersGroup) {
-        await addContactToHopRelayGroup({
+        await createHopRelayContact({
           secret: settings.hoprelayApiSecret,
+          name: customerName || phone,
           phone: phone,
-          groupId: customersGroup.id || customersGroup.gid,
+          groups: String(customersGroup.id), // Pass group ID as string
         });
-        console.log(`Contact added to "Customers" group: ${phone}`);
+        console.log(`Contact saved and added to "Customers" group: ${customerName} (${phone})`);
       }
     } catch (contactError) {
       console.error("Failed to manage contact in HopRelay:", contactError);

@@ -243,14 +243,15 @@ export async function getHopRelayWaAccounts({ secret }) {
 }
 
 // Contact Management Functions
-export async function saveHopRelayContact({ secret, name, phone }) {
+export async function createHopRelayContact({ secret, name, phone, groups }) {
   const form = new FormData();
   form.set("secret", secret);
   form.set("name", name);
   form.set("phone", phone);
+  form.set("groups", groups); // Comma-separated group IDs
 
   const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/save/contact`,
+    `${HOPRELAY_API_BASE_URL}/create/contact`,
     {
       method: "POST",
       body: form,
@@ -261,7 +262,21 @@ export async function saveHopRelayContact({ secret, name, phone }) {
 }
 
 export async function getHopRelayGroups({ secret }) {
-  const json = await fetchHopRelayApiWithSecret("/get/groups", secret);
+  // Use page=1 and limit=1000 to get all groups
+  const form = new FormData();
+  form.set("secret", secret);
+  form.set("page", "1");
+  form.set("limit", "1000");
+
+  const response = await fetch(
+    `${HOPRELAY_API_BASE_URL}/get/groups`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  const json = await parseJsonResponse(response);
   return json.data || [];
 }
 
@@ -278,41 +293,9 @@ export async function createHopRelayGroup({ secret, name }) {
     },
   );
 
-  return parseJsonResponse(response);
-}
-
-export async function addContactToHopRelayGroup({ secret, phone, groupId }) {
-  const form = new FormData();
-  form.set("secret", secret);
-  form.set("phone", phone);
-  form.set("group", groupId);
-
-  const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/add/group.contact`,
-    {
-      method: "POST",
-      body: form,
-    },
-  );
-
-  return parseJsonResponse(response);
-}
-
-export async function removeContactFromHopRelayGroup({ secret, phone, groupId }) {
-  const form = new FormData();
-  form.set("secret", secret);
-  form.set("phone", phone);
-  form.set("group", groupId);
-
-  const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/delete/group.contact`,
-    {
-      method: "POST",
-      body: form,
-    },
-  );
-
-  return parseJsonResponse(response);
+  const json = await parseJsonResponse(response);
+  // Return the full response since group ID should be in json.data
+  return json;
 }
 
 export async function findHopRelayUserByEmail(email) {
