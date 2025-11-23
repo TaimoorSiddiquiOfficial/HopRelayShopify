@@ -1737,10 +1737,30 @@ export default function Index() {
               />
               <s-stack direction="block" gap="base">
                 <s-text>
-                  Configure templates for order events. You can use placeholders
-                  like {"{{order_name}}"}, {"{{customer_name}}"},{" "}
-                  {"{{tracking_url}}"}.
+                  Configure templates for order events using the placeholders below.
                 </s-text>
+                
+                <s-section>
+                  <s-text weight="bold" size="small">Available Placeholders</s-text>
+                  <s-stack direction="block" gap="tight">
+                    <s-text size="small">
+                      <strong>Customer:</strong> {"{{customer_name}}"}, {"{{customer_first_name}}"}, {"{{customer_last_name}}"}, {"{{customer_email}}"}, {"{{customer_phone}}"}
+                    </s-text>
+                    <s-text size="small">
+                      <strong>Order:</strong> {"{{order_name}}"}, {"{{order_number}}"}, {"{{order_total}}"}, {"{{order_subtotal}}"}, {"{{order_tax}}"}, {"{{order_shipping}}"}, {"{{items_count}}"}, {"{{order_date}}"}, {"{{order_time}}"}
+                    </s-text>
+                    <s-text size="small">
+                      <strong>Shipping:</strong> {"{{tracking_url}}"}, {"{{tracking_number}}"}, {"{{tracking_company}}"}, {"{{shipping_address}}"}, {"{{estimated_delivery}}"}
+                    </s-text>
+                    <s-text size="small">
+                      <strong>Delivery:</strong> {"{{delivery_date}}"}, {"{{delivery_time}}"}
+                    </s-text>
+                    <s-text size="small">
+                      <strong>Shop:</strong> {"{{shop_name}}"}, {"{{shop_url}}"}, {"{{support_email}}"}, {"{{support_phone}}"}
+                    </s-text>
+                  </s-stack>
+                </s-section>
+                
                 <s-stack direction="block" gap="tight">
                   <label>
                     <input
