@@ -1773,32 +1773,37 @@ export default function Index() {
                     Send notification when order is delivered (if used)
                   </label>
                 </s-stack>
+                <s-stack direction="block" gap="tight">
+                  <s-text variation="subdued" style="font-size: 13px;">
+                    💡 <strong>Tip:</strong> Copy & paste emojis from your keyboard or use Windows Key + . (period) for emoji picker
+                  </s-text>
+                </s-stack>
                 <s-text-field
                   label="Order received message"
-                  help-text="Supports emojis! 📱 Variables: {{customer_name}}, {{order_name}}, {{order_total}}, {{shop_name}}"
+                  help-text="Available: {{customer_name}}, {{customer_first_name}}, {{customer_last_name}}, {{order_name}}, {{order_number}}, {{order_total}}, {{order_subtotal}}, {{order_tax}}, {{order_shipping}}, {{shop_name}}, {{order_date}}, {{order_time}}, {{items_count}}"
                   name="orderCreatedTemplate"
                   multiline
-                  rows={4}
+                  rows={5}
                   value={hoprelaySettings?.orderCreatedTemplate || ""}
-                  placeholder="Hi {{customer_name}}! 👋&#10;&#10;We received your order {{order_name}}. Thank you for shopping with us! 🛍️"
+                  placeholder="Hi {{customer_first_name}}! 👋&#10;&#10;We received your order #{{order_number}} for {{order_total}}.&#10;&#10;Thank you for shopping with {{shop_name}}! 🛍️"
                 />
                 <s-text-field
                   label="Order shipped message"
-                  help-text="Supports emojis! 📦 Variables: {{customer_name}}, {{order_name}}, {{tracking_url}}, {{tracking_number}}"
+                  help-text="Available: {{customer_name}}, {{customer_first_name}}, {{order_name}}, {{order_number}}, {{tracking_url}}, {{tracking_number}}, {{tracking_company}}, {{shipping_address}}, {{estimated_delivery}}, {{shop_name}}"
                   name="orderShippedTemplate"
                   multiline
-                  rows={4}
+                  rows={5}
                   value={hoprelaySettings?.orderShippedTemplate || ""}
-                  placeholder="Good news! 🎉 Order {{order_name}} has shipped.&#10;&#10;Track your package: {{tracking_url}}"
+                  placeholder="Great news {{customer_first_name}}! 🎉&#10;&#10;Your order #{{order_number}} has shipped!&#10;&#10;📦 Tracking: {{tracking_url}}&#10;Carrier: {{tracking_company}}"
                 />
                 <s-text-field
                   label="Order delivered message"
-                  help-text="Supports emojis! ✅ Variables: {{customer_name}}, {{order_name}}, {{shop_name}}"
+                  help-text="Available: {{customer_name}}, {{customer_first_name}}, {{order_name}}, {{order_number}}, {{delivery_date}}, {{delivery_time}}, {{shop_name}}, {{shop_url}}, {{support_email}}, {{support_phone}}"
                   name="orderDeliveredTemplate"
                   multiline
-                  rows={4}
+                  rows={5}
                   value={hoprelaySettings?.orderDeliveredTemplate || ""}
-                  placeholder="Your order {{order_name}} was delivered! ✅&#10;&#10;Thank you for shopping with us! We hope to see you again soon. 😊"
+                  placeholder="Hi {{customer_first_name}}! ✅&#10;&#10;Your order #{{order_number}} was delivered!&#10;&#10;Thank you for choosing {{shop_name}}! We hope to see you again soon. 😊&#10;&#10;Need help? Contact us at {{support_email}}"
                 />
                 <s-button
                   type="submit"
