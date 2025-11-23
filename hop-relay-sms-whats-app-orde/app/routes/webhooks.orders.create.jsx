@@ -66,12 +66,16 @@ export const action = async ({ request }) => {
       "";
 
     // Save contact to HopRelay and add to "Customers" group
+    // Note: This requires the API key to have "get_groups", "create_group", and "create_contact" permissions
     try {
+      console.log('[Contact Management] Attempting to get groups from HopRelay...');
       // Get or create "Customers" group
       const groups = await getHopRelayGroups({ secret: settings.hoprelayApiSecret });
+      console.log(`[Contact Management] Retrieved ${groups.length} groups`);
       let customersGroup = groups.find(g => g.name === "Customers");
       
       if (!customersGroup) {
+        console.log('[Contact Management] "Customers" group not found, creating...');
         const result = await createHopRelayGroup({
           secret: settings.hoprelayApiSecret,
           name: "Customers",
@@ -79,21 +83,35 @@ export const action = async ({ request }) => {
         // Re-fetch groups to get the new group ID
         const updatedGroups = await getHopRelayGroups({ secret: settings.hoprelayApiSecret });
         customersGroup = updatedGroups.find(g => g.name === "Customers");
-        console.log('Created "Customers" group');
+        console.log('[Contact Management] Created "Customers" group with ID:', customersGroup?.id);
+      } else {
+        console.log('[Contact Management] Found "Customers" group with ID:', customersGroup.id);
       }
 
       // Create contact with group ID
       if (customersGroup) {
+        console.log(`[Contact Management] Creating contact: ${customerName} (${phone}) in group ${customersGroup.id}`);
         await createHopRelayContact({
           secret: settings.hoprelayApiSecret,
           name: customerName || phone,
           phone: phone,
           groups: String(customersGroup.id), // Pass group ID as string
         });
-        console.log(`Contact saved and added to "Customers" group: ${customerName} (${phone})`);
+        console.log(`[Contact Management] ✓ Contact saved to "Customers" group: ${customerName} (${phone})`);
       }
     } catch (contactError) {
-      console.error("Failed to manage contact in HopRelay:", contactError);
+      // Log detailed error information
+      if (contactError.details?.status === 403) {
+        console.error('[Contact Management] ⚠️  API key permission error:', contactError.details.message);
+        console.error('[Contact Management] To enable contact management, your HopRelay API key needs these permissions:');
+        console.error('[Contact Management]   - get_groups');
+        console.error('[Contact Management]   - create_group');
+        console.error('[Contact Management]   - create_contact');
+        console.error('[Contact Management] Please update your API key permissions at https://hoprelay.com/dashboard/keys');
+      } else {
+        console.error('[Contact Management] Failed to manage contact:', contactError.message);
+        console.error('[Contact Management] Error details:', contactError.details);
+      }
       // Continue with notification even if contact management fails
     }
 
