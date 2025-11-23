@@ -21,30 +21,122 @@ export async function sendVerificationEmail({ to, code, name }) {
     <!DOCTYPE html>
     <html>
     <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-        .content { background-color: #f9f9f9; padding: 30px; border-radius: 5px; margin-top: 20px; }
-        .code { font-size: 32px; font-weight: bold; color: #4CAF50; text-align: center; letter-spacing: 5px; margin: 20px 0; padding: 15px; background: white; border: 2px dashed #4CAF50; }
-        .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #666; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+          line-height: 1.6; 
+          color: #ffffff; 
+          background-color: #0a0a0a;
+          margin: 0;
+          padding: 0;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 0 auto; 
+          background-color: #1a1a1a;
+        }
+        .header { 
+          background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+          padding: 40px 20px; 
+          text-align: center;
+          border-bottom: 2px solid #333;
+        }
+        .logo { 
+          max-width: 180px; 
+          height: auto;
+          margin-bottom: 10px;
+        }
+        .content { 
+          background-color: #1a1a1a;
+          padding: 40px 30px; 
+        }
+        .greeting {
+          font-size: 24px;
+          font-weight: 600;
+          color: #ffffff;
+          margin-bottom: 20px;
+        }
+        .message {
+          font-size: 16px;
+          color: #cccccc;
+          margin-bottom: 30px;
+        }
+        .code-container {
+          text-align: center;
+          margin: 30px 0;
+        }
+        .code { 
+          display: inline-block;
+          font-size: 36px; 
+          font-weight: bold; 
+          color: #4CAF50; 
+          letter-spacing: 8px; 
+          padding: 20px 40px;
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+          border: 2px solid #4CAF50;
+          border-radius: 10px;
+          box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+        .expiry {
+          text-align: center;
+          font-size: 14px;
+          color: #999;
+          margin-top: 20px;
+        }
+        .warning {
+          background-color: #2a2a2a;
+          border-left: 4px solid #ff9800;
+          padding: 15px;
+          margin-top: 30px;
+          font-size: 14px;
+          color: #cccccc;
+        }
+        .footer { 
+          background-color: #0a0a0a;
+          padding: 30px 20px; 
+          text-align: center; 
+          font-size: 12px; 
+          color: #666;
+          border-top: 2px solid #333;
+        }
+        .footer a {
+          color: #4CAF50;
+          text-decoration: none;
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <h1>HopRelay Shopify Integration</h1>
+          <img src="https://hoprelay.com/uploads/theme/logo-light.png" alt="HopRelay" class="logo">
+          <div style="color: #ffffff; font-size: 18px; font-weight: 300; margin-top: 10px;">
+            Shopify Integration
+          </div>
         </div>
         <div class="content">
-          <h2>Hello${name ? ' ' + name : ''}!</h2>
-          <p>Your verification code for connecting your HopRelay account is:</p>
-          <div class="code">${code}</div>
-          <p>This code will expire in <strong>10 minutes</strong>.</p>
-          <p>If you didn't request this code, please ignore this email.</p>
+          <div class="greeting">Hello${name ? ' ' + name : ''}! 👋</div>
+          <div class="message">
+            Your verification code for connecting your HopRelay account to Shopify is ready:
+          </div>
+          <div class="code-container">
+            <div class="code">${code}</div>
+          </div>
+          <div class="expiry">
+            ⏰ This code will expire in <strong style="color: #ff9800;">10 minutes</strong>
+          </div>
+          <div class="warning">
+            🔒 <strong>Security Notice:</strong> If you didn't request this code, please ignore this email and ensure your account is secure.
+          </div>
         </div>
         <div class="footer">
-          <p>© ${new Date().getFullYear()} HopRelay. All rights reserved.</p>
-          <p>This is an automated email, please do not reply.</p>
+          <p style="margin: 10px 0;">© ${new Date().getFullYear()} HopRelay. All rights reserved.</p>
+          <p style="margin: 10px 0;">
+            <a href="https://hoprelay.com">Visit HopRelay</a> | 
+            <a href="https://hoprelay.com/support">Support</a>
+          </p>
+          <p style="margin: 10px 0; color: #555;">This is an automated email, please do not reply.</p>
         </div>
       </div>
     </body>
