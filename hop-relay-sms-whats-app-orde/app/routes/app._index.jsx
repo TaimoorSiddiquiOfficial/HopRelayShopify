@@ -126,14 +126,6 @@ export const loader = async ({ request }) => {
 
       hoprelayDevices = devices || [];
       hoprelayWaAccounts = waAccounts || [];
-      
-      // Debug: Log device and WhatsApp account data to see status fields
-      if (hoprelayDevices.length > 0) {
-        console.log('[Devices] Sample device data:', JSON.stringify(hoprelayDevices[0], null, 2));
-      }
-      if (hoprelayWaAccounts.length > 0) {
-        console.log('[WhatsApp] Sample account data:', JSON.stringify(hoprelayWaAccounts[0], null, 2));
-      }
     }
   } catch (error) {
     hoprelaySendersError =
@@ -1718,8 +1710,8 @@ export default function Index() {
                       align="center"
                     >
                       <s-badge tone="success">WhatsApp</s-badge>
-                      <s-badge tone={account.status === "1" || account.status === 1 ? "success" : "critical"}>
-                        {account.status === "1" || account.status === 1 ? "Connected" : "Disconnected"}
+                      <s-badge tone={account.status === "connected" ? "success" : "critical"}>
+                        {account.status === "connected" ? "Connected" : "Disconnected"}
                       </s-badge>
                       <s-text>
                         {account.name || "WhatsApp account"} (
