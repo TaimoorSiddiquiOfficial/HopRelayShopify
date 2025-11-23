@@ -250,7 +250,7 @@ export async function saveHopRelayContact({ secret, name, phone }) {
   form.set("phone", phone);
 
   const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/contacts/save`,
+    `${HOPRELAY_API_BASE_URL}/save/contact`,
     {
       method: "POST",
       body: form,
@@ -261,7 +261,7 @@ export async function saveHopRelayContact({ secret, name, phone }) {
 }
 
 export async function getHopRelayGroups({ secret }) {
-  const json = await fetchHopRelayApiWithSecret("/contacts/groups", secret);
+  const json = await fetchHopRelayApiWithSecret("/get/groups", secret);
   return json.data || [];
 }
 
@@ -271,7 +271,7 @@ export async function createHopRelayGroup({ secret, name }) {
   form.set("name", name);
 
   const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/contacts/groups/create`,
+    `${HOPRELAY_API_BASE_URL}/create/group`,
     {
       method: "POST",
       body: form,
@@ -288,7 +288,7 @@ export async function addContactToHopRelayGroup({ secret, phone, groupId }) {
   form.set("group", groupId);
 
   const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/contacts/groups/add`,
+    `${HOPRELAY_API_BASE_URL}/add/group.contact`,
     {
       method: "POST",
       body: form,
@@ -305,7 +305,7 @@ export async function removeContactFromHopRelayGroup({ secret, phone, groupId })
   form.set("group", groupId);
 
   const response = await fetch(
-    `${HOPRELAY_API_BASE_URL}/contacts/groups/remove`,
+    `${HOPRELAY_API_BASE_URL}/delete/group.contact`,
     {
       method: "POST",
       body: form,
