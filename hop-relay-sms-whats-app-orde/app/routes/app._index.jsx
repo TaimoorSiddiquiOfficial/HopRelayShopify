@@ -1775,30 +1775,30 @@ export default function Index() {
                 </s-stack>
                 <s-text-field
                   label="Order received message"
-                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{order_total}}, {{shop_name}}"
+                  help-text="Supports emojis! 📱 Variables: {{customer_name}}, {{order_name}}, {{order_total}}, {{shop_name}}"
                   name="orderCreatedTemplate"
                   multiline
-                  rows={3}
+                  rows={4}
                   value={hoprelaySettings?.orderCreatedTemplate || ""}
-                  placeholder="Hi {{customer_name}}, we received your order {{order_name}}. Thank you for shopping with us!"
+                  placeholder="Hi {{customer_name}}! 👋&#10;&#10;We received your order {{order_name}}. Thank you for shopping with us! 🛍️"
                 />
                 <s-text-field
                   label="Order shipped message"
-                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{tracking_url}}, {{tracking_number}}"
+                  help-text="Supports emojis! 📦 Variables: {{customer_name}}, {{order_name}}, {{tracking_url}}, {{tracking_number}}"
                   name="orderShippedTemplate"
                   multiline
-                  rows={3}
+                  rows={4}
                   value={hoprelaySettings?.orderShippedTemplate || ""}
-                  placeholder="Good news! Order {{order_name}} has shipped. Track: {{tracking_url}}."
+                  placeholder="Good news! 🎉 Order {{order_name}} has shipped.&#10;&#10;Track your package: {{tracking_url}}"
                 />
                 <s-text-field
                   label="Order delivered message"
-                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{shop_name}}"
+                  help-text="Supports emojis! ✅ Variables: {{customer_name}}, {{order_name}}, {{shop_name}}"
                   name="orderDeliveredTemplate"
                   multiline
-                  rows={3}
+                  rows={4}
                   value={hoprelaySettings?.orderDeliveredTemplate || ""}
-                  placeholder="Your order {{order_name}} was delivered. Thank you for shopping with us!"
+                  placeholder="Your order {{order_name}} was delivered! ✅&#10;&#10;Thank you for shopping with us! We hope to see you again soon. 😊"
                 />
                 <s-button
                   type="submit"
