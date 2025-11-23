@@ -242,6 +242,79 @@ export async function getHopRelayWaAccounts({ secret }) {
   return json.data || [];
 }
 
+// Contact Management Functions
+export async function saveHopRelayContact({ secret, name, phone }) {
+  const form = new FormData();
+  form.set("secret", secret);
+  form.set("name", name);
+  form.set("phone", phone);
+
+  const response = await fetch(
+    `${HOPRELAY_API_BASE_URL}/contacts/save`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  return parseJsonResponse(response);
+}
+
+export async function getHopRelayGroups({ secret }) {
+  const json = await fetchHopRelayApiWithSecret("/contacts/groups", secret);
+  return json.data || [];
+}
+
+export async function createHopRelayGroup({ secret, name }) {
+  const form = new FormData();
+  form.set("secret", secret);
+  form.set("name", name);
+
+  const response = await fetch(
+    `${HOPRELAY_API_BASE_URL}/contacts/groups/create`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  return parseJsonResponse(response);
+}
+
+export async function addContactToHopRelayGroup({ secret, phone, groupId }) {
+  const form = new FormData();
+  form.set("secret", secret);
+  form.set("phone", phone);
+  form.set("group", groupId);
+
+  const response = await fetch(
+    `${HOPRELAY_API_BASE_URL}/contacts/groups/add`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  return parseJsonResponse(response);
+}
+
+export async function removeContactFromHopRelayGroup({ secret, phone, groupId }) {
+  const form = new FormData();
+  form.set("secret", secret);
+  form.set("phone", phone);
+  form.set("group", groupId);
+
+  const response = await fetch(
+    `${HOPRELAY_API_BASE_URL}/contacts/groups/remove`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  return parseJsonResponse(response);
+}
+
 export async function findHopRelayUserByEmail(email) {
   // If system token is not valid, we'll skip the admin API lookup
   // and rely on password verification instead

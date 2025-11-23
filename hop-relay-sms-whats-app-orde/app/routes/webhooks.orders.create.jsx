@@ -3,6 +3,10 @@ import prisma from "../db.server";
 import {
   sendHopRelaySms,
   sendHopRelayWhatsapp,
+  saveHopRelayContact,
+  getHopRelayGroups,
+  createHopRelayGroup,
+  addContactToHopRelayGroup,
 } from "../hoprelay.server";
 
 function extractPhone(order) {
@@ -61,6 +65,43 @@ export const action = async ({ request }) => {
       payload.billing_address?.name ||
       payload.customer?.last_name ||
       "";
+
+    // Save contact to HopRelay and add to "Customers" group
+    try {
+      // Save contact
+      await saveHopRelayContact({
+        secret: settings.hoprelayApiSecret,
+        name: customerName || phone,
+        phone: phone,
+      });
+      console.log(`Contact saved: ${customerName} (${phone})`);
+
+      // Get or create "Customers" group
+      const groups = await getHopRelayGroups({ secret: settings.hoprelayApiSecret });
+      let customersGroup = groups.find(g => g.name === "Customers");
+      
+      if (!customersGroup) {
+        const result = await createHopRelayGroup({
+          secret: settings.hoprelayApiSecret,
+          name: "Customers",
+        });
+        customersGroup = result.data;
+        console.log('Created "Customers" group');
+      }
+
+      // Add contact to "Customers" group
+      if (customersGroup) {
+        await addContactToHopRelayGroup({
+          secret: settings.hoprelayApiSecret,
+          phone: phone,
+          groupId: customersGroup.id || customersGroup.gid,
+        });
+        console.log(`Contact added to "Customers" group: ${phone}`);
+      }
+    } catch (contactError) {
+      console.error("Failed to manage contact in HopRelay:", contactError);
+      // Continue with notification even if contact management fails
+    }
 
     const message = renderTemplate(template, {
       order_name: payload.name || "",
