@@ -126,6 +126,14 @@ export const loader = async ({ request }) => {
 
       hoprelayDevices = devices || [];
       hoprelayWaAccounts = waAccounts || [];
+      
+      // Debug: Log device and WhatsApp account data to see status fields
+      if (hoprelayDevices.length > 0) {
+        console.log('[Devices] Sample device data:', JSON.stringify(hoprelayDevices[0], null, 2));
+      }
+      if (hoprelayWaAccounts.length > 0) {
+        console.log('[WhatsApp] Sample account data:', JSON.stringify(hoprelayWaAccounts[0], null, 2));
+      }
     }
   } catch (error) {
     hoprelaySendersError =
