@@ -265,7 +265,10 @@ export const action = async ({ request }) => {
                 "sms_send",
                 "wa_send",
                 "sms_send_bulk",
-                "wa_send_bulk"
+                "wa_send_bulk",
+                "get_groups",
+                "create_group",
+                "create_contact"
               ],
             });
 
@@ -550,6 +553,9 @@ export const action = async ({ request }) => {
           "get_devices",
           "get_wa_accounts",
           "get_subscription",
+          "get_groups",
+          "create_group",
+          "create_contact",
         ];
 
         if (smsEnabled) {
