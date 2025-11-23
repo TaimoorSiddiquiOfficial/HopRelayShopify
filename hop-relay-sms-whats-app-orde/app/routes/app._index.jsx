@@ -1774,7 +1774,7 @@ export default function Index() {
                   </label>
                 </s-stack>
                 <s-stack direction="block" gap="tight">
-                  <s-text variation="subdued" style="font-size: 13px;">
+                  <s-text>
                     💡 <strong>Tip:</strong> Copy & paste emojis from your keyboard or use Windows Key + . (period) for emoji picker
                   </s-text>
                 </s-stack>
