@@ -1681,6 +1681,9 @@ export default function Index() {
                       align="center"
                     >
                       <s-badge tone="success">SMS</s-badge>
+                      <s-badge tone={device.status === "1" || device.status === 1 ? "success" : "critical"}>
+                        {device.status === "1" || device.status === 1 ? "Connected" : "Disconnected"}
+                      </s-badge>
                       <s-text>
                         {device.device_name || "Android device"} (
                         {device.phone || "No number"})
@@ -1707,6 +1710,9 @@ export default function Index() {
                       align="center"
                     >
                       <s-badge tone="success">WhatsApp</s-badge>
+                      <s-badge tone={account.status === "1" || account.status === 1 ? "success" : "critical"}>
+                        {account.status === "1" || account.status === 1 ? "Connected" : "Disconnected"}
+                      </s-badge>
                       <s-text>
                         {account.name || "WhatsApp account"} (
                         {account.phone || account.number || "No number"})
@@ -1769,22 +1775,28 @@ export default function Index() {
                 </s-stack>
                 <s-text-field
                   label="Order received message"
+                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{order_total}}, {{shop_name}}"
                   name="orderCreatedTemplate"
                   multiline
+                  rows={3}
                   value={hoprelaySettings?.orderCreatedTemplate || ""}
-                  placeholder="Hi {{customer_name}}, we received your order {{order_name}}."
+                  placeholder="Hi {{customer_name}}, we received your order {{order_name}}. Thank you for shopping with us!"
                 />
                 <s-text-field
                   label="Order shipped message"
+                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{tracking_url}}, {{tracking_number}}"
                   name="orderShippedTemplate"
                   multiline
+                  rows={3}
                   value={hoprelaySettings?.orderShippedTemplate || ""}
                   placeholder="Good news! Order {{order_name}} has shipped. Track: {{tracking_url}}."
                 />
                 <s-text-field
                   label="Order delivered message"
+                  help-text="Supports emojis! Variables: {{customer_name}}, {{order_name}}, {{shop_name}}"
                   name="orderDeliveredTemplate"
                   multiline
+                  rows={3}
                   value={hoprelaySettings?.orderDeliveredTemplate || ""}
                   placeholder="Your order {{order_name}} was delivered. Thank you for shopping with us!"
                 />
