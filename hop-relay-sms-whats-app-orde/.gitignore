@@ -13,9 +13,8 @@ database.sqlite
 .env
 .env.*
 
-
-
-
+# Railway environment variables (contains sensitive data)
+RAILWAY-ENV-VARS.txt
 
 /extensions/*/dist
 
